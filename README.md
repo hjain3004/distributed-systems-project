@@ -209,6 +209,86 @@ This project demonstrates key distributed systems concepts:
 - Shared threading has 10-15% overhead but supports unlimited connections
 - Dedicated threading: higher performance, limited to Nthreads/2 connections
 
+## Tandem Queue Model (Li et al. 2015)
+
+### Two-Stage Architecture
+
+The tandem queue model represents a **two-stage broker→receiver** communication system:
+
+```
+Publishers → [Stage 1: Broker] → Network → [Stage 2: Receiver] → Consumers
+             (n₁ servers, μ₁)    (D, p)    (n₂ servers, μ₂)
+```
+
+### Critical Insight: Stage 2 Load Amplification
+
+**Key Equation:**
+```
+Λ₂ = λ/(1-p)
+```
+
+Due to transmission failures (probability p), **Stage 2 sees higher arrival rate** than Stage 1!
+
+**Example:**
+- λ = 100 msg/sec at broker
+- p = 0.2 (20% failure rate)
+- Λ₂ = 125 msg/sec at receiver (25% higher!)
+
+### Quick Start
+
+```python
+from src.core.config import TandemQueueConfig
+from src.models.tandem_queue import run_tandem_simulation
+from src.analysis.analytical import TandemQueueAnalytical
+
+# Configure two-stage system
+config = TandemQueueConfig(
+    arrival_rate=100,        # λ = 100 msg/sec
+    n1=10, mu1=12,          # Stage 1: broker
+    n2=12, mu2=12,          # Stage 2: receiver (needs more capacity!)
+    network_delay=0.01,      # 10ms network delay
+    failure_prob=0.2,        # 20% transmission failures
+    sim_duration=1000,
+    warmup_time=100
+)
+
+# Run simulation
+results = run_tandem_simulation(config)
+print(f"End-to-end latency: {results['mean_end_to_end']*1000:.2f} ms")
+
+# Compare with analytical
+analytical = TandemQueueAnalytical(
+    lambda_arrival=100,
+    n1=10, mu1=12,
+    n2=12, mu2=12,
+    network_delay=0.01,
+    failure_prob=0.2
+)
+
+print(f"Analytical latency: {analytical.total_message_delivery_time()*1000:.2f} ms")
+analytical.compare_stages()  # Shows Stage 2 load increase
+```
+
+### Run Tandem Queue Experiments
+
+```bash
+# Validate analytical model
+python experiments/tandem_queue_validation.py
+
+# Quick analytical validation
+python debug/validate_tandem_analytical.py
+```
+
+### Key Formulas
+
+See `TANDEM_QUEUE_EQUATIONS.md` for complete mathematical documentation.
+
+**Essential equations:**
+- Stage 2 arrival: `Λ₂ = λ/(1-p)`
+- Stage 2 utilization: `ρ₂ = λ/((1-p)·n₂·μ₂)`
+- Network time: `(2+p)·D_link`
+- Total latency: `W₁ + S₁ + (2+p)·D + W₂ + S₂`
+
 ## Testing
 
 ```bash

@@ -252,3 +252,197 @@ class ThreadingAnalytical:
         Uses Erlang-C formula
         """
         return mmn.erlang_c() * mmn.rho
+
+
+class TandemQueueAnalytical:
+    """
+    Analytical model for two-stage tandem queue (Li et al. 2015)
+
+    System:
+        Stage 1: λ → M/M/n₁ (broker)
+        Network: D_link delay, probability p of failure
+        Stage 2: Λ₂ = λ/(1-p) → M/M/n₂ (receiver)
+
+    Key insight: Stage 2 sees HIGHER arrival rate due to retransmissions!
+    """
+
+    def __init__(self, lambda_arrival: float,
+                 n1: int, mu1: float,
+                 n2: int, mu2: float,
+                 network_delay: float,
+                 failure_prob: float):
+        """
+        Args:
+            lambda_arrival: Arrival rate at Stage 1 (λ)
+            n1: Number of broker servers
+            mu1: Broker service rate (per server)
+            n2: Number of receiver servers
+            mu2: Receiver service rate (per server)
+            network_delay: One-way network delay (D_link)
+            failure_prob: Transmission failure probability (p)
+        """
+        self.lambda_ = lambda_arrival
+        self.n1 = n1
+        self.mu1 = mu1
+        self.n2 = n2
+        self.mu2 = mu2
+        self.D_link = network_delay
+        self.p = failure_prob
+
+        # Stage 1 utilization
+        self.rho1 = lambda_arrival / (n1 * mu1)
+
+        # Stage 2 EFFECTIVE arrival rate (includes retries!)
+        self.Lambda2 = lambda_arrival / (1 - failure_prob)
+        self.rho2 = self.Lambda2 / (n2 * mu2)
+
+        # Validate stability
+        if self.rho1 >= 1.0:
+            raise ValueError(f"Stage 1 unstable: ρ₁ = {self.rho1:.3f} >= 1")
+        if self.rho2 >= 1.0:
+            raise ValueError(f"Stage 2 unstable: ρ₂ = {self.rho2:.3f} >= 1")
+
+        # Create M/M/N models for each stage
+        self.stage1_model = MMNAnalytical(self.lambda_, self.n1, self.mu1)
+        self.stage2_model = MMNAnalytical(self.Lambda2, self.n2, self.mu2)
+
+    def stage1_waiting_time(self) -> float:
+        """Mean waiting time at broker (Stage 1)"""
+        return self.stage1_model.mean_waiting_time()
+
+    def stage1_service_time(self) -> float:
+        """Mean service time at broker"""
+        return 1.0 / self.mu1
+
+    def stage1_response_time(self) -> float:
+        """Mean response time at broker (wait + service)"""
+        return self.stage1_waiting_time() + self.stage1_service_time()
+
+    def expected_network_time(self) -> float:
+        """
+        Expected network time including retries
+
+        E[Network Time] = (2 + p) · D_link
+
+        Derivation:
+        - Initial transmission: D_link (broker → receiver)
+        - ACK/NACK: D_link (receiver → broker)
+        - Expected retries: p transmissions need retry
+        - Each retry adds D_link (send) + D_link (ack) = 2·D_link
+        - But simplified: (2 + p)·D_link captures average behavior
+
+        Examples:
+        - p=0 (no failures): 2·D_link (send + ack only)
+        - p=0.2: 2.2·D_link (20% higher due to retries)
+        - p=0.5: 2.5·D_link (50% higher due to retries)
+        """
+        return (2 + self.p) * self.D_link
+
+    def stage2_waiting_time(self) -> float:
+        """
+        Mean waiting time at receiver (Stage 2)
+
+        CRITICAL: Uses Λ₂ = λ/(1-p) as arrival rate!
+
+        This is HIGHER than λ because failed transmissions retry,
+        effectively increasing the load on Stage 2.
+        """
+        return self.stage2_model.mean_waiting_time()
+
+    def stage2_service_time(self) -> float:
+        """Mean service time at receiver"""
+        return 1.0 / self.mu2
+
+    def stage2_response_time(self) -> float:
+        """Mean response time at receiver (wait + service)"""
+        return self.stage2_waiting_time() + self.stage2_service_time()
+
+    def total_message_delivery_time(self) -> float:
+        """
+        Total end-to-end message delivery time
+
+        T_total = W₁ + S₁ + (2+p)·D_link + W₂ + S₂
+
+        where:
+          W₁ = waiting time at broker
+          S₁ = service time at broker = 1/μ₁
+          (2+p)·D_link = expected network time (send + ack + retries)
+          W₂ = waiting time at receiver
+          S₂ = service time at receiver = 1/μ₂
+
+        This is Equation (X) from Li et al. (2015)
+        """
+        W1 = self.stage1_waiting_time()
+        S1 = self.stage1_service_time()
+
+        Network = self.expected_network_time()
+
+        W2 = self.stage2_waiting_time()
+        S2 = self.stage2_service_time()
+
+        T_total = W1 + S1 + Network + W2 + S2
+        return T_total
+
+    def all_metrics(self) -> Dict[str, float]:
+        """Return all analytical metrics"""
+        return {
+            # System parameters
+            'lambda': self.lambda_,
+            'Lambda2': self.Lambda2,
+            'Lambda2_increase': (self.Lambda2 / self.lambda_ - 1) * 100,  # % increase
+            'rho1': self.rho1,
+            'rho2': self.rho2,
+
+            # Stage 1 metrics
+            'stage1_mean_wait': self.stage1_waiting_time(),
+            'stage1_mean_service': self.stage1_service_time(),
+            'stage1_mean_response': self.stage1_response_time(),
+            'stage1_mean_queue_length': self.stage1_model.mean_queue_length(),
+
+            # Network metrics
+            'expected_network_time': self.expected_network_time(),
+            'network_delay_factor': 2 + self.p,
+
+            # Stage 2 metrics
+            'stage2_mean_wait': self.stage2_waiting_time(),
+            'stage2_mean_service': self.stage2_service_time(),
+            'stage2_mean_response': self.stage2_response_time(),
+            'stage2_mean_queue_length': self.stage2_model.mean_queue_length(),
+
+            # End-to-end metrics
+            'total_delivery_time': self.total_message_delivery_time(),
+        }
+
+    def compare_stages(self) -> None:
+        """
+        Print comparison showing Stage 2 has higher load
+
+        Demonstrates the key insight: transmission failures increase
+        Stage 2 arrival rate!
+        """
+        print(f"\n{'='*70}")
+        print(f"Tandem Queue Analysis: Stage Comparison")
+        print(f"{'='*70}")
+
+        print(f"\nArrival Rates:")
+        print(f"  Stage 1: λ₁ = {self.lambda_:.2f} msg/sec")
+        print(f"  Stage 2: Λ₂ = λ/(1-p) = {self.Lambda2:.2f} msg/sec")
+        print(f"  Increase: {((self.Lambda2/self.lambda_ - 1)*100):.1f}% higher at Stage 2!")
+
+        print(f"\nUtilization:")
+        print(f"  Stage 1: ρ₁ = {self.rho1:.3f}")
+        print(f"  Stage 2: ρ₂ = {self.rho2:.3f}")
+        if self.rho2 > self.rho1:
+            print(f"  ⚠️  Stage 2 is MORE loaded than Stage 1 (bottleneck!)")
+
+        print(f"\nWaiting Times:")
+        print(f"  Stage 1: W₁ = {self.stage1_waiting_time():.6f} sec")
+        print(f"  Stage 2: W₂ = {self.stage2_waiting_time():.6f} sec")
+
+        print(f"\nTotal End-to-End Latency:")
+        print(f"  T_total = {self.total_message_delivery_time():.6f} sec")
+        print(f"  Breakdown:")
+        print(f"    Stage 1: {self.stage1_response_time():.6f} sec ({self.stage1_response_time()/self.total_message_delivery_time()*100:.1f}%)")
+        print(f"    Network: {self.expected_network_time():.6f} sec ({self.expected_network_time()/self.total_message_delivery_time()*100:.1f}%)")
+        print(f"    Stage 2: {self.stage2_response_time():.6f} sec ({self.stage2_response_time()/self.total_message_delivery_time()*100:.1f}%)")
+        print(f"{'='*70}\n")
