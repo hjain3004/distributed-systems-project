@@ -50,6 +50,94 @@ class ExponentialService:
         return 1.0  # Always 1 for exponential
 
 
+class ErlangService:
+    """
+    Erlang distribution service time (M/Ek/N)
+
+    The Erlang distribution is a special case of Gamma distribution
+    with integer shape parameter k, representing the sum of k
+    independent exponential random variables.
+
+    Use cases:
+    - Multi-stage processing (k stages, each exponential)
+    - Call centers with k service phases
+    - Manufacturing with k sequential operations
+
+    PDF: f(x) = (λ^k / (k-1)!) * x^(k-1) * e^(-λx)
+
+    Properties:
+    - E[S] = k/λ
+    - Var[S] = k/λ²
+    - CV² = 1/k (decreases with more phases)
+    - As k→∞, approaches deterministic service time (M/D/N)
+
+    Reference:
+    Gross, D., & Harris, C. M. (1998). Fundamentals of queueing theory.
+    Wiley-Interscience.
+    """
+
+    def __init__(self, shape: int, rate: float):
+        """
+        Args:
+            shape: k (number of phases, must be positive integer)
+            rate: λ (rate parameter for each phase)
+
+        Example:
+            >>> # 3-phase service, each phase with rate 12
+            >>> erlang = ErlangService(shape=3, rate=12)
+            >>> print(f"Mean: {erlang.mean():.3f}")  # 0.250
+            >>> print(f"CV²: {erlang.coefficient_of_variation():.3f}")  # 0.333
+        """
+        if not isinstance(shape, int) or shape < 1:
+            raise ValueError("Shape parameter k must be a positive integer")
+
+        if rate <= 0:
+            raise ValueError("Rate parameter must be positive")
+
+        self.shape = shape  # k
+        self.rate = rate    # λ
+        self._dist = stats.erlang(a=shape, scale=1/rate)
+
+    def sample(self) -> float:
+        """Generate one sample from Erlang distribution"""
+        return self._dist.rvs()
+
+    def mean(self) -> float:
+        """E[S] = k/λ"""
+        return self.shape / self.rate
+
+    def variance(self) -> float:
+        """Var[S] = k/λ²"""
+        return self.shape / (self.rate ** 2)
+
+    def coefficient_of_variation(self) -> float:
+        """
+        CV² = 1/k (decreases with more phases)
+
+        This shows:
+        - k=1: CV²=1 (exponential, M/M/N)
+        - k=2: CV²=0.5
+        - k=4: CV²=0.25
+        - k→∞: CV²→0 (deterministic, M/D/N)
+        """
+        return 1.0 / self.shape
+
+    def percentile(self, p: float) -> float:
+        """Exact percentile using scipy"""
+        return self._dist.ppf(p)
+
+    def pdf(self, x: float) -> float:
+        """Probability density function"""
+        return self._dist.pdf(x)
+
+    def cdf(self, x: float) -> float:
+        """Cumulative distribution function"""
+        return self._dist.cdf(x)
+
+    def __repr__(self) -> str:
+        return f"ErlangService(shape={self.shape}, rate={self.rate:.3f})"
+
+
 class ParetoService:
     """Pareto (heavy-tailed) service time
 
@@ -177,7 +265,18 @@ def create_distribution(config) -> ServiceTimeDistribution:
     Returns:
         ServiceTimeDistribution instance
     """
-    if config.distribution == "pareto":
+    if config.distribution == "exponential":
+        return ExponentialService(rate=config.service_rate)
+
+    elif config.distribution == "erlang":
+        # Erlang-k distribution
+        shape = config.erlang_k if hasattr(config, 'erlang_k') else 2
+        # Adjust rate to maintain mean service time: E[S] = k/λ = 1/μ
+        # Therefore: λ = k * μ
+        rate = shape * config.service_rate
+        return ErlangService(shape=shape, rate=rate)
+
+    elif config.distribution == "pareto":
         return ParetoService(alpha=config.alpha, scale=config.scale)
 
     elif config.distribution == "lognormal":

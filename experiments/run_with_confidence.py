@@ -1,7 +1,7 @@
 """
 Statistical Rigorous Experiments with Confidence Intervals
 
-Runs each experiment configuration multiple times (N=10 replications)
+Runs each experiment configuration multiple times (N=20 replications)
 and calculates 95% confidence intervals for all metrics.
 
 Statistical rigor ensures results are reproducible and significant.
@@ -24,7 +24,7 @@ from src.models.threading import run_dedicated_simulation, run_shared_simulation
 class ReplicationRunner:
     """Run multiple replications and calculate statistics"""
 
-    def __init__(self, n_replications=10):
+    def __init__(self, n_replications=20):
         self.n_replications = n_replications
 
     def run_replications(self, experiment_func, config_dict, description):
@@ -105,7 +105,7 @@ def experiment_mmn_with_confidence():
     print("Experiment 1: M/M/N with Confidence Intervals")
     print("="*70)
 
-    runner = ReplicationRunner(n_replications=10)
+    runner = ReplicationRunner(n_replications=20)
 
     def run_mmn_exp(config_dict):
         config = MMNConfig(**config_dict)
@@ -148,7 +148,7 @@ def experiment_mgn_with_confidence():
     print("Experiment 2: M/G/N Heavy-Tail with Confidence Intervals")
     print("="*70)
 
-    runner = ReplicationRunner(n_replications=10)
+    runner = ReplicationRunner(n_replications=20)
 
     alphas = [2.1, 2.5, 3.0]
     all_results = {}
@@ -208,7 +208,7 @@ def experiment_threading_with_confidence():
     print("Experiment 3: Threading Models with Confidence Intervals")
     print("="*70)
 
-    runner = ReplicationRunner(n_replications=10)
+    runner = ReplicationRunner(n_replications=20)
 
     # Test at ρ=0.7 (medium load)
     arrival_rate = 168
@@ -289,7 +289,7 @@ def main():
 
     print("\n" + "="*70)
     print(" STATISTICAL RIGOROUS EXPERIMENTS")
-    print(" Running 10 Replications with 95% Confidence Intervals")
+    print(" Running 20 Replications with 95% Confidence Intervals")
     print("="*70)
 
     # Run all experiments
@@ -352,7 +352,7 @@ def main():
     print("✓ ALL EXPERIMENTS COMPLETED WITH STATISTICAL RIGOR")
     print("="*70)
     print("\nStatistical Summary:")
-    print("  - Replications per configuration: 10")
+    print("  - Replications per configuration: 20")
     print("  - Confidence level: 95%")
     print("  - Statistical test: t-distribution (appropriate for small samples)")
     print("  - All results include mean ± margin of error")

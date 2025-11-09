@@ -17,6 +17,10 @@ class MessageOrdering:
     Message ordering and consistency manager
 
     Based on Li et al. (2015) Section 3: Message Consistency
+
+    CRITICAL DIFFERENCE (Algorithm 4, Fig. 10, p.13):
+    - In-order: Uses queue_index, consumer WAITS for specific message ID
+    - Out-of-order: Random sampling, takes ANY available message (faster)
     """
 
     def __init__(self, mode: str = "out_of_order"):
@@ -30,6 +34,10 @@ class MessageOrdering:
         self.mode = mode
         self.messages: OrderedDict[int, CloudMessage] = OrderedDict()
         self.sequence_number = 0
+
+        # Queue index for in-order mode (Algorithm 4, p.13)
+        # Consumer waits for message with sequence == queue_index
+        self.queue_index = 0
 
     def enqueue(self, message: CloudMessage):
         """
@@ -51,6 +59,12 @@ class MessageOrdering:
         """
         Retrieve message based on consistency mode
 
+        CRITICAL DIFFERENCE (Paper Algorithm 4, Fig. 10, p.13):
+        - In-order: Wait for message with sequence == queue_index (causes delays!)
+        - Out-of-order: Take ANY visible message (no waiting, faster)
+
+        This is WHY out-of-order is ~50% faster in the paper's results.
+
         Returns:
             CloudMessage if available, None otherwise
         """
@@ -58,12 +72,32 @@ class MessageOrdering:
             return None
 
         if self.mode == "in_order":
-            # FIFO: Get oldest message by insertion order
-            message_id = next(iter(self.messages))
-            return self.messages.pop(message_id)
+            # In-order delivery (Algorithm 4, p.13):
+            # Consumer MUST wait for message with sequence == queue_index
+            # This creates delays when messages arrive out of order
+
+            # Search for message with the SPECIFIC queue_index
+            target_message = None
+            for message in self.messages.values():
+                if hasattr(message, 'vector_clock') and len(message.vector_clock) > 0:
+                    if message.vector_clock[0] == self.queue_index:
+                        target_message = message
+                        break
+
+            if target_message is None:
+                # Required message not yet arrived - consumer must WAIT
+                # This is the bottleneck that makes in-order slower!
+                return None
+
+            # Found the indexed message - deliver it and advance index
+            self.messages.pop(target_message.id)
+            self.queue_index += 1
+            return target_message
+
         else:
             # Out-of-order: Random sampling (models distributed storage)
             # Paper: "one of the nodes is randomly sampled"
+            # No waiting - takes ANY available message (much faster!)
             message_id = random.choice(list(self.messages.keys()))
             return self.messages.pop(message_id)
 

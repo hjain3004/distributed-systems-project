@@ -2,7 +2,7 @@
 
 import numpy as np
 from scipy import special
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 
 
 class MMNAnalytical:
@@ -163,11 +163,19 @@ class MGNAnalytical:
         """
         Equation 10 (extended): Wq for M/G/N (approximation)
 
-        Standard approximation from queueing theory:
+        Uses Kingman's approximation for M/G/N queues:
         Wq(M/G/N) ≈ Wq(M/M/N) × (1 + C²) / 2
 
         This adjusts the M/M/N baseline by the service time variability.
-        When C²=1 (exponential), this gives Wq(M/M/N).
+        When C²=1 (exponential), this reduces to Wq(M/M/N).
+
+        Citation:
+        Kingman, J. F. C. (1961). "The single server queue in heavy traffic."
+        Mathematical Proceedings of the Cambridge Philosophical Society, 57(4), 902-904.
+
+        Also discussed in:
+        Whitt, W. (1993). "Approximations for the GI/G/m queue."
+        Production and Operations Management, 2(2), 114-161.
         """
         # Get baseline M/M/N waiting time
         mmn = MMNAnalytical(self.lambda_, self.N, self.mu)
@@ -185,10 +193,27 @@ class MGNAnalytical:
 
     def p99_response_time(self) -> float:
         """
-        Equation 15: R99 ≈ E[R] + 2.33·σR
+        Equation 15: R99 ≈ E[R] + 2.33·σR (HEURISTIC APPROXIMATION)
+
+        ⚠️ WARNING: This uses a normal approximation which is INVALID for heavy-tail
+        distributions (e.g., Pareto with α < 3). For heavy tails, the 99th percentile
+        can be much higher than predicted by this formula.
+
+        Limitations:
+        - Assumes normally distributed response times (not true for heavy tails)
+        - For Pareto with α ∈ (2, 3): variance exists but distribution has heavy tails
+        - For Pareto with α ≤ 2: variance is INFINITE (this formula is meaningless)
+
+        Recommendations:
+        - For light-tail distributions (exponential, uniform): Use this approximation
+        - For heavy-tail distributions: Use EMPIRICAL p99 from simulation
+        - For α ≤ 3: Expect simulation p99 >> analytical p99
 
         Using approximation: σR ≈ √(Var[Wq] + Var[S])
         For M/G/N, Var[Wq] is approximated from heavy-tail impact
+
+        This method is provided for comparison purposes only. Always validate
+        against simulation results, especially for heavy-tail workloads.
         """
         mean_R = self.mean_response_time()
 
@@ -197,9 +222,85 @@ class MGNAnalytical:
         var_R_approx = self.VarS * (1 + C_squared)
         sigma_R = np.sqrt(var_R_approx)
 
-        # 99th percentile (z = 2.33 for normal approximation)
+        # 99th percentile using normal approximation (z = 2.33)
+        # NOTE: This is a heuristic only. Heavy tails violate normality assumption.
         R99 = mean_R + 2.33 * sigma_R
         return R99
+
+    def p99_response_time_improved(self,
+                                   method: str = "evt",
+                                   empirical_data: Optional[np.ndarray] = None,
+                                   threshold_percentile: float = 0.90) -> float:
+        """
+        Improved P99 estimation for heavy-tailed distributions
+
+        This method addresses the limitations of the normal approximation by using
+        either bootstrap methods or Extreme Value Theory (EVT).
+
+        Args:
+            method: Estimation method
+                - "evt": Extreme Value Theory using GPD (best for heavy tails)
+                - "empirical": Bootstrap-based empirical percentiles
+                - "normal": Original normal approximation (legacy)
+            empirical_data: Required for "evt" and "empirical" methods.
+                           Should be array of response time samples from simulation.
+            threshold_percentile: For EVT method, percentile for tail fitting (default 0.90)
+
+        Returns:
+            P99 response time estimate
+
+        Example:
+            >>> # Run simulation to get empirical data
+            >>> metrics = run_mgn_simulation(config)
+            >>> response_times = metrics.response_times
+            >>>
+            >>> # Get improved P99 estimate
+            >>> analytical = MGNAnalytical(...)
+            >>> p99_evt = analytical.p99_response_time_improved("evt", response_times)
+            >>> p99_bootstrap = analytical.p99_response_time_improved("empirical", response_times)
+
+        Reference:
+            McNeil, A. J., Frey, R., & Embrechts, P. (2015).
+            Quantitative risk management. Princeton University Press.
+        """
+        if method == "normal":
+            # Use existing normal approximation
+            return self.p99_response_time()
+
+        if empirical_data is None:
+            raise ValueError(
+                f"Method '{method}' requires empirical_data from simulation. "
+                "Run simulation first and pass response_times array."
+            )
+
+        empirical_data = np.asarray(empirical_data)
+
+        if len(empirical_data) == 0:
+            raise ValueError("empirical_data cannot be empty")
+
+        if method == "empirical":
+            # Use bootstrap method
+            from .empirical_percentiles import EmpiricalPercentileEstimator
+
+            estimator = EmpiricalPercentileEstimator(empirical_data)
+            p99, lower, upper = estimator.bootstrap_percentile(0.99)
+
+            return p99
+
+        elif method == "evt":
+            # Use Extreme Value Theory (GPD)
+            from .extreme_value_theory import ExtremeValueAnalyzer
+
+            analyzer = ExtremeValueAnalyzer(empirical_data)
+            p99 = analyzer.extreme_quantile(0.99, threshold_percentile=threshold_percentile)
+
+            return p99
+
+        else:
+            raise ValueError(
+                f"Unknown method: {method}. "
+                "Choose from 'evt', 'empirical', or 'normal'"
+            )
 
     def all_metrics(self) -> Dict[str, float]:
         """Return all analytical metrics"""
@@ -211,6 +312,109 @@ class MGNAnalytical:
             'mean_waiting_time': self.mean_waiting_time_mgn(),
             'mean_response_time': self.mean_response_time(),
             'p99_response_time': self.p99_response_time(),
+        }
+
+
+class MEkNAnalytical:
+    """
+    Analytical formulas for M/Ek/N queues
+
+    M/Ek/N Queue: Poisson arrivals, Erlang-k service, N servers
+
+    The Erlang distribution models k-phase service processes.
+    As k increases, service becomes more predictable (CV² = 1/k).
+
+    Reference:
+    Gross, D., & Harris, C. M. (1998). Fundamentals of queueing theory.
+    Wiley-Interscience.
+    """
+
+    def __init__(self, arrival_rate: float, num_threads: int,
+                 service_rate: float, erlang_k: int):
+        """
+        Args:
+            arrival_rate: λ (messages/sec)
+            num_threads: N (number of servers)
+            service_rate: μ (messages/sec per thread)
+            erlang_k: k (number of Erlang phases)
+        """
+        self.lambda_ = arrival_rate
+        self.N = num_threads
+        self.mu = service_rate
+        self.k = erlang_k
+
+        # Mean service time (same as M/M/N for same μ)
+        self.ES = 1.0 / service_rate
+
+        # Variance of Erlang-k: Var[S] = k/λ² where λ = k*μ
+        # Simplified: Var[S] = 1/(k*μ²)
+        self.VarS = 1.0 / (erlang_k * service_rate ** 2)
+
+        # Utilization
+        self.rho = arrival_rate / (num_threads * service_rate)
+
+        if self.rho >= 1.0:
+            raise ValueError(f"System unstable: ρ = {self.rho:.3f} >= 1")
+
+    def coefficient_of_variation(self) -> float:
+        """
+        CV² = 1/k for Erlang-k distribution
+
+        This shows that:
+        - k=1: CV²=1 (exponential, same as M/M/N)
+        - k=2: CV²=0.5
+        - k=4: CV²=0.25
+        - k→∞: CV²→0 (deterministic, approaches M/D/N)
+        """
+        return 1.0 / self.k
+
+    def mean_waiting_time(self) -> float:
+        """
+        Mean waiting time for M/Ek/N queue
+
+        Uses Kingman's approximation:
+        Wq(M/Ek/N) ≈ Wq(M/M/N) × (1 + CV²)/2
+                   = Wq(M/M/N) × (1 + 1/k)/2
+
+        As k increases, waiting time decreases (more predictable service).
+
+        Reference:
+        Kingman, J. F. C. (1961). The single server queue in heavy traffic.
+        """
+        # Get M/M/N baseline
+        mmn = MMNAnalytical(self.lambda_, self.N, self.mu)
+        wq_mmn = mmn.mean_waiting_time()
+
+        # Apply Erlang correction factor
+        cv_squared = self.coefficient_of_variation()
+        wq = wq_mmn * (1 + cv_squared) / 2
+
+        return wq
+
+    def mean_response_time(self) -> float:
+        """Mean response time: R = Wq + E[S]"""
+        return self.mean_waiting_time() + self.ES
+
+    def mean_queue_length(self) -> float:
+        """Mean queue length using Little's Law: Lq = λ * Wq"""
+        return self.lambda_ * self.mean_waiting_time()
+
+    def mean_system_size(self) -> float:
+        """Mean number in system: L = Lq + λ*E[S]"""
+        return self.mean_queue_length() + self.lambda_ * self.ES
+
+    def all_metrics(self) -> Dict[str, float]:
+        """Return all analytical metrics"""
+        return {
+            'erlang_k': self.k,
+            'utilization': self.rho,
+            'mean_service': self.ES,
+            'var_service': self.VarS,
+            'cv_squared': self.coefficient_of_variation(),
+            'mean_waiting_time': self.mean_waiting_time(),
+            'mean_response_time': self.mean_response_time(),
+            'mean_queue_length': self.mean_queue_length(),
+            'mean_system_size': self.mean_system_size(),
         }
 
 
