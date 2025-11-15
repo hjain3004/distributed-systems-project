@@ -1,21 +1,67 @@
-# Testing Guide - Distributed Systems Features
+# Testing Guide - Distributed Systems Project
+
+**Complete Testing Documentation**
+
+This guide covers all testing procedures for the distributed systems performance modeling project.
 
 ## Quick Start - Test Everything
 
-Run all validations at once:
+### Option 1: Quick Automated Test (Recommended)
 
 ```bash
-# Test 1: Cloud Message Broker (visibility timeout, replication, ordering)
-python3 experiments/cloud_broker_simulation.py
+# Run all distributed systems feature tests (4 tests in ~10 seconds)
+./test_all.sh
+```
 
-# Test 2: Distributed Systems Protocols (Raft, Vector Clocks, CAP)
-python3 experiments/distributed_systems_validation.py
+**Expected Output:**
+```
+=========================================
+Testing Distributed Systems Features
+=========================================
 
-# Test 3: Two-Phase Commit Protocol
-python3 experiments/two_phase_commit_validation.py
+[1/4] Testing Cloud Message Broker...
+      ✓ Cloud broker tests PASSED
 
-# Test 4: CAP Theorem Analysis (standalone)
-python3 -m src.analysis.cap_analysis
+[2/4] Testing Distributed Systems (Raft + Vector Clocks + CAP)...
+      ✓ Distributed systems tests PASSED
+
+[3/4] Testing Two-Phase Commit...
+      ✓ 2PC tests PASSED
+
+[4/4] Testing CAP Theorem Analysis...
+      ✓ CAP analysis PASSED
+
+=========================================
+✓ All tests completed successfully!
+=========================================
+```
+
+### Option 2: Comprehensive Unit Tests
+
+```bash
+# Run all 29 unit tests with verbose output (~97 seconds)
+python3 -m pytest tests/ -v
+```
+
+**Expected Output:**
+```
+============================= test session starts ==============================
+collected 29 items
+
+tests/test_erlang.py::TestErlangDistribution::test_erlang_mean PASSED    [  3%]
+tests/test_erlang.py::TestErlangDistribution::test_erlang_variance PASSED [  6%]
+...
+tests/test_queueing_laws.py::TestTandemQueue::test_stage2_arrival_rate PASSED [ 89%]
+tests/test_queueing_laws.py::TestStabilityConditions::test_tandem_stage2_stability_check PASSED [100%]
+
+======================== 29 passed in 97.74s (0:01:37) =========================
+```
+
+### Option 3: Complete Rebuild
+
+```bash
+# Run ALL tests, experiments, and generate plots (~15-20 minutes)
+./rebuild_all.sh
 ```
 
 ---
@@ -399,4 +445,105 @@ python3 -c "from src.models.two_phase_commit import TwoPhaseCommitCluster; print
 
 ---
 
-*Last updated: 2025-11-07*
+## Unit Test Coverage
+
+### tests/test_erlang.py (12 tests)
+
+Tests for M/Ek/N queue model with Erlang-k distribution:
+
+1. **TestErlangDistribution** (5 tests)
+   - `test_erlang_mean`: Validates E[X] = k/μ
+   - `test_erlang_variance`: Validates Var[X] = k/μ²
+   - `test_erlang_cv_squared`: Validates CV² = 1/k
+   - `test_erlang_k1_is_exponential`: Validates Erlang(1) = Exponential
+   - `test_erlang_as_k_increases`: Validates CV decreases as k increases
+
+2. **TestMEkNQueue** (3 tests)
+   - `test_mekn_stability_check`: Validates ρ < 1 enforcement
+   - `test_mekn_basic_simulation`: Basic M/Ek/N simulation
+   - `test_mekn_different_k_values`: Tests k=1,2,5,10
+
+3. **TestMEkNAnalytical** (4 tests)
+   - `test_mekn_analytical_cv_squared`: Validates analytical CV² formula
+   - `test_mekn_waiting_time_formula`: Validates M/G/N approximation
+   - `test_mekn_littles_law`: Validates L = λW
+   - `test_mekn_vs_simulation_accuracy`: Validates error <15%
+
+### tests/test_extreme_values.py (13 tests)
+
+Tests for Extreme Value Theory (EVT) and percentile estimation:
+
+1. **TestEmpiricalPercentiles** (4 tests)
+   - Bootstrap percentile estimation
+   - Standard error calculation
+   - Exponential and Pareto validation
+
+2. **TestExtremeValueTheory** (7 tests)
+   - Generalized Pareto Distribution (GPD) fitting
+   - Extreme quantile estimation
+   - Hill estimator for tail index
+   - Confidence interval calculation
+   - EVT assumptions validation
+
+3. **TestComparisonMethods** (2 tests)
+   - Compare empirical vs EVT methods
+   - Validate convergence
+
+### tests/test_queueing_laws.py (4 tests)
+
+Tests for fundamental queueing laws and tandem queue:
+
+1. **TestLittlesLaw** (1 test)
+   - `test_littles_law_mmn`: Validates L = λW for M/M/N
+
+2. **TestTandemQueue** (2 tests)
+   - `test_stage2_arrival_rate`: Validates Λ₂ = λ/(1-p)
+   - `test_network_time_formula`: Validates E[T_net] = (2+p)·D
+
+3. **TestStabilityConditions** (1 test)
+   - `test_mmn_stability_check`: Validates ρ < 1 enforcement
+   - `test_tandem_stage2_stability_check`: Validates Stage 2 stability
+
+### Test Summary
+
+**Total Tests**: 29 (all passing)
+**Code Coverage**:
+- Queue models (M/M/N, M/G/N, M/Ek/N, Tandem): ✓
+- Distributions (Pareto, Erlang, Exponential): ✓
+- Analytical formulas (Erlang-C, Little's Law, M/G/N): ✓
+- Statistical methods (Bootstrap, EVT): ✓
+- Stability validation (ρ < 1): ✓
+
+---
+
+## Test Runtime Summary
+
+| Test Suite | Tests | Runtime | Purpose |
+|------------|-------|---------|---------|
+| `./test_all.sh` | 4 integration tests | ~10 sec | Quick smoke test |
+| `pytest tests/` | 29 unit tests | ~97 sec | Comprehensive validation |
+| `./rebuild_all.sh` | All + experiments + plots | ~15-20 min | Complete rebuild |
+
+---
+
+## Continuous Integration
+
+To run tests in CI/CD pipeline:
+
+```bash
+#!/bin/bash
+# Install dependencies
+pip3 install -q simpy numpy scipy pandas matplotlib seaborn pydantic pytest
+
+# Run quick tests
+./test_all.sh || exit 1
+
+# Run comprehensive tests
+python3 -m pytest tests/ -v --tb=short || exit 1
+
+echo "All tests passed!"
+```
+
+---
+
+**Last Updated**: 2025-11-15

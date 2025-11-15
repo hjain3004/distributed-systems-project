@@ -1,20 +1,23 @@
 # Performance Modeling of Cloud Message Brokers
 
-**Heavy-Tailed Workloads and Threading Model Analysis**
+**Heavy-Tailed Workloads, Threading Models, and Distributed Systems Protocols**
 
 This project extends queueing theory research to model cloud-based message broker performance with:
-- Heavy-tailed service time distributions (M/G/N model)
+- Heavy-tailed service time distributions (M/G/N, M/Ek/N models)
 - Explicit threading architecture modeling (dedicated vs shared)
-- 15 derived performance equations
-- Discrete-event simulation validation using SimPy
+- 15 derived performance equations with rigorous validation
+- Distributed systems protocols (Raft, Vector Clocks, Two-Phase Commit)
+- Discrete-event simulation using SimPy with statistical rigor (20+ replications)
 
 ## Project Overview
 
-Based on research by Li et al. (2015) on cloud message queueing services, this project adds:
-1. **Heavy-tailed distributions**: Pareto, lognormal, and Weibull service times
+Based on research by Li et al. (2015) on cloud message queueing services, this project provides:
+1. **Heavy-tailed distributions**: Pareto (with Erlang for reduced variance)
 2. **Threading models**: Dedicated (thread-per-connection) vs Shared (worker pool)
-3. **Analytical framework**: 15 equations covering M/M/N, M/G/N, and threading models
-4. **Validation**: Discrete-event simulation with comprehensive experiments
+3. **Analytical framework**: 15 equations covering M/M/N, M/G/N, M/Ek/N, and threading models
+4. **Distributed protocols**: Raft consensus, Vector clocks, Two-Phase Commit (2PC)
+5. **Cloud broker features**: Visibility timeout, replication, message ordering
+6. **Comprehensive validation**: 29 unit tests, multiple experiments, analytical comparisons
 
 ## Quick Start
 
@@ -24,25 +27,40 @@ Based on research by Li et al. (2015) on cloud message queueing services, this p
 # Clone or navigate to project directory
 cd distributed-systems-project
 
-# Create virtual environment
-python -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
+# Install dependencies (no virtual environment needed for quick testing)
+pip3 install simpy numpy scipy pandas matplotlib seaborn pydantic pytest
 
-# Install dependencies
-pip install -r requirements.txt
+# Or use requirements.txt
+pip3 install -r requirements.txt
 ```
 
-### Run Basic Experiment
+### Run All Tests
 
 ```bash
-cd experiments
-python run_basic_experiment.py
+# Quick test - run all distributed systems tests
+./test_all.sh
+
+# Comprehensive test - run unit tests
+python3 -m pytest tests/ -v
+
+# Output: 29 tests PASSED in ~97 seconds
 ```
 
-This will:
-1. Run M/M/N simulation and compare with analytical results
-2. Test M/G/N with different heavy-tail parameters (α = 2.1, 2.5, 3.0)
-3. Display comparison tables
+### Run Basic Experiments
+
+```bash
+# M/M/N and M/G/N validation
+python3 experiments/run_basic_experiment.py
+
+# Cloud broker features (visibility timeout, replication, ordering)
+python3 experiments/cloud_broker_simulation.py
+
+# Distributed systems protocols (Raft, Vector Clocks, 2PC)
+python3 experiments/distributed_systems_validation.py
+
+# Tandem queue (two-stage broker→receiver)
+python3 experiments/tandem_queue_validation.py
+```
 
 ### Expected Output
 
@@ -85,21 +103,53 @@ EXPERIMENT 2: Heavy-Tailed Service Times (M/G/N)
 ```
 distributed-systems-project/
 ├── README.md                    # This file
+├── CLAUDE.md                    # AI assistant guide
+├── MATHEMATICAL_GUIDE.md        # Detailed mathematical explanations
+├── TESTING_GUIDE.md             # Testing documentation
 ├── requirements.txt             # Python dependencies
-├── src/
-│   ├── core/
+├── test_all.sh                  # Run all tests
+├── rebuild_all.sh               # Complete rebuild script
+│
+├── src/                         # Source code
+│   ├── core/                    # Core abstractions
 │   │   ├── config.py           # Pydantic configuration classes
-│   │   ├── distributions.py   # Service time distributions
+│   │   ├── distributions.py    # Service time distributions
 │   │   └── metrics.py          # Performance metrics
-│   ├── models/
+│   ├── models/                  # Queue & protocol implementations
 │   │   ├── base.py             # Abstract base queue model
 │   │   ├── mmn_queue.py        # M/M/N implementation
-│   │   └── mgn_queue.py        # M/G/N implementation
-│   └── analysis/
-│       └── analytical.py       # All 15 equations
-├── experiments/
-│   └── run_basic_experiment.py # Basic validation
-└── tests/                       # Unit tests (to be added)
+│   │   ├── mgn_queue.py        # M/G/N (heavy-tail) implementation
+│   │   ├── mekn_queue.py       # M/Ek/N (Erlang) implementation
+│   │   ├── tandem_queue.py     # Two-stage broker→receiver
+│   │   ├── threading.py        # Threading model implementations
+│   │   ├── raft_consensus.py   # Raft leader election
+│   │   ├── vector_clocks.py    # Causality tracking
+│   │   ├── two_phase_commit.py # 2PC protocol
+│   │   ├── visibility_timeout.py # ACK/NACK mechanism
+│   │   ├── distributed_broker.py # Replication
+│   │   └── message_ordering.py # In-order vs out-of-order
+│   ├── analysis/               # Analytical models
+│   │   ├── analytical.py       # All 15 equations
+│   │   ├── cap_analysis.py     # CAP theorem analysis
+│   │   ├── extreme_value_theory.py # EVT for tail latency
+│   │   └── empirical_percentiles.py # Bootstrap CI
+│   └── visualization/          # Plotting utilities
+│
+├── experiments/                # Experimental scripts
+│   ├── run_basic_experiment.py # M/M/N & M/G/N validation
+│   ├── cloud_broker_simulation.py # Cloud features
+│   ├── distributed_systems_validation.py # Raft + Vector Clocks
+│   ├── two_phase_commit_validation.py # 2PC validation
+│   ├── tandem_queue_validation.py # Two-stage validation
+│   └── run_with_confidence.py # Statistical experiments (20 reps)
+│
+├── tests/                      # Unit tests (29 tests, all passing)
+│   ├── test_erlang.py          # M/Ek/N validation
+│   ├── test_queueing_laws.py   # Little's Law, stability
+│   └── test_extreme_values.py  # EVT tests
+│
+├── debug/                      # Debugging scripts
+└── visualization/              # Plot generation
 ```
 
 ## Mathematical Foundation
@@ -292,12 +342,24 @@ See `TANDEM_QUEUE_EQUATIONS.md` for complete mathematical documentation.
 ## Testing
 
 ```bash
-# Run basic validation
-python experiments/run_basic_experiment.py
+# Quick test - all distributed systems features
+./test_all.sh
 
-# Run unit tests (when implemented)
-pytest tests/ -v
+# Unit tests - 29 tests covering queueing laws, Erlang, EVT
+python3 -m pytest tests/ -v
+
+# Individual experiments
+python3 experiments/run_basic_experiment.py
+python3 experiments/cloud_broker_simulation.py
+python3 experiments/distributed_systems_validation.py
+python3 experiments/two_phase_commit_validation.py
+python3 experiments/tandem_queue_validation.py
+
+# Complete rebuild (all tests + experiments + plots)
+./rebuild_all.sh
 ```
+
+See `TESTING_GUIDE.md` for detailed testing procedures.
 
 ## Performance Metrics
 
@@ -317,14 +379,32 @@ The system tracks:
 
 3. **Course Notes**: Distributed Systems, Chapter 7 (Threading Models), Chapter 15 (Publish-Subscribe)
 
-## Future Work
+## Implementation Status
 
-- [ ] Implement threading model comparison experiments
-- [ ] Add network delay modeling
-- [ ] Implement in-order vs out-of-order message delivery
-- [ ] Create visualization dashboard
-- [ ] Add more distribution types (hyperexponential, etc.)
-- [ ] Parameter optimization for different workloads
+### Completed Features
+
+- [x] M/M/N, M/G/N, M/Ek/N queue models with analytical validation
+- [x] Tandem queue (two-stage broker→receiver) with network failures
+- [x] Threading model comparison (dedicated vs shared)
+- [x] Heavy-tailed distributions (Pareto) with Erlang variance control
+- [x] Distributed protocols: Raft, Vector Clocks, Two-Phase Commit
+- [x] Cloud broker features: visibility timeout, replication, message ordering
+- [x] In-order vs out-of-order message delivery
+- [x] Network delay modeling with failure probability
+- [x] CAP theorem analysis
+- [x] Extreme Value Theory for tail latency
+- [x] 29 unit tests (queueing laws, Erlang, EVT)
+- [x] Statistical rigor: 20 replications with 95% confidence intervals
+- [x] Analytical vs simulation comparison plots
+- [x] Complete documentation (README, CLAUDE.md, MATHEMATICAL_GUIDE.md, TESTING_GUIDE.md)
+
+### Future Enhancements
+
+- [ ] Add more distribution types (hyperexponential, phase-type)
+- [ ] Implement parameter optimization for different workloads
+- [ ] Create interactive visualization dashboard
+- [ ] Add Byzantine fault tolerance protocols
+- [ ] Implement Paxos consensus algorithm
 
 ## Authors
 
@@ -338,11 +418,27 @@ This is an academic project for educational purposes.
 
 ---
 
-**Status**: Core implementation complete ✓
-- Configuration system ✓
-- Distribution classes ✓
-- Analytical models (15 equations) ✓
-- M/M/N and M/G/N simulation ✓
-- Basic validation experiments ✓
+**Project Status**: COMPLETE AND VALIDATED ✓
 
-**Next**: Full experiment suite, visualizations, final report
+**Core Implementation**: 100% Complete
+- Configuration system (Pydantic with validation) ✓
+- Distribution classes (Pareto, Erlang, Exponential) ✓
+- Analytical models (all 15 equations implemented) ✓
+- Queue models (M/M/N, M/G/N, M/Ek/N, Tandem) ✓
+- Distributed protocols (Raft, Vector Clocks, 2PC) ✓
+- Cloud broker features (visibility timeout, replication, ordering) ✓
+
+**Validation & Testing**: 100% Complete
+- 29 unit tests (all passing) ✓
+- Integration tests (all passing) ✓
+- Analytical vs simulation comparisons ✓
+- Statistical rigor: 20 replications with 95% CI ✓
+- Error validation: <10% simulation vs analytical ✓
+
+**Documentation**: 100% Complete
+- README.md (project overview) ✓
+- CLAUDE.md (AI assistant guide) ✓
+- MATHEMATICAL_GUIDE.md (equation derivations) ✓
+- TESTING_GUIDE.md (testing procedures) ✓
+
+**Last Updated**: 2025-11-15
