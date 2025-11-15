@@ -19,11 +19,11 @@ Based on research by Li et al. (2015) on cloud message queueing services, this p
 3. **Analytical framework**: 15 equations covering M/M/N, M/G/N, M/Ek/N, and threading models
 4. **Advanced approximations**: Whitt (1993) and Allen-Cunneen methods for M/G/N queues
 5. **Extreme condition testing**: High utilization (ρ > 0.95), infinite variance (α < 2), cascade failures
-6. **Priority queues**: Multiple priority classes with configurable scheduling (config ready)
-7. **Finite capacity**: M/M/N/K with blocking and admission control (config ready)
+6. **Priority queues**: M/M/N with multiple priority classes (preemptive & non-preemptive scheduling)
+7. **Finite capacity**: M/M/N/K with Erlang-B blocking formulas and admission control
 8. **Distributed protocols**: Raft consensus, Vector clocks, Two-Phase Commit (2PC)
 9. **Cloud broker features**: Visibility timeout, replication, message ordering
-10. **Comprehensive validation**: 39 unit tests (including 10 extreme condition tests), analytical comparisons
+10. **Comprehensive validation**: 63 unit tests (8 priority queue + 16 finite capacity + 10 extreme + 29 core tests)
 
 ## Quick Start
 
@@ -49,10 +49,16 @@ pip3 install -r requirements.txt
 # Comprehensive test - run unit tests
 python3 -m pytest tests/ -v
 
-# Output: 39 tests PASSED (including 10 extreme condition tests)
+# Output: 63 tests PASSED
+#   - 8 priority queue tests (test_priority_queues.py)
+#   - 16 finite capacity tests (test_finite_capacity.py)
+#   - 10 extreme condition tests (test_extreme_conditions.py)
+#   - 29 core tests (test_erlang.py, test_queueing_laws.py, etc.)
 
-# Run extreme condition tests specifically
-python3 -m pytest tests/test_extreme_conditions.py -v
+# Run specific test suites
+python3 -m pytest tests/test_priority_queues.py -v     # Priority queues
+python3 -m pytest tests/test_finite_capacity.py -v     # Finite capacity
+python3 -m pytest tests/test_extreme_conditions.py -v  # Extreme conditions
 ```
 
 ### Run Basic Experiments
@@ -293,6 +299,133 @@ stats = metrics.summary_statistics()
 print(f"Simulated mean wait: {stats['mean_wait']:.6f} sec")
 print(f"P99 response time: {stats['p99_response']:.6f} sec")
 ```
+
+### 7. Priority Queues (M/M/N with Multiple Priority Classes)
+```python
+from src.core.config import PriorityQueueConfig
+from src.models.priority_queue import run_priority_queue_simulation, compare_priority_classes
+
+# Configure priority queue with 3 priority classes
+config = PriorityQueueConfig(
+    arrival_rate=75.0,      # Total arrival rate
+    num_threads=8,
+    service_rate=10.0,
+    num_priorities=3,
+    priority_rates=[20.0, 30.0, 25.0],  # Per-priority arrival rates (High, Med, Low)
+    preemptive=False,       # Non-preemptive scheduling
+    sim_duration=200.0,
+    warmup_time=50.0,
+    random_seed=42
+)
+
+# Run simulation
+results = run_priority_queue_simulation(config)
+
+# Compare priority classes
+compare_priority_classes(results)
+
+# Output:
+# Priority 1 (highest): mean_wait = 0.014s, P99 = 0.47s
+# Priority 2 (medium):  mean_wait = 0.038s, P99 = 0.54s
+# Priority 3 (lowest):  mean_wait = 0.376s, P99 = 2.76s
+
+# Test preemptive scheduling
+config_preempt = PriorityQueueConfig(
+    arrival_rate=60.0,
+    num_threads=8,
+    service_rate=10.0,
+    num_priorities=2,
+    priority_rates=[40.0, 20.0],
+    preemptive=True,  # Higher priority can interrupt service
+    sim_duration=200.0,
+    warmup_time=50.0
+)
+
+# Preemptive gives even better service to high priority
+# Priority 1: mean_wait = 0.001s (vs 0.011s non-preemptive)
+```
+
+**Key Features:**
+- Multiple priority classes (1 = highest priority)
+- Non-preemptive: Higher priority jumps queue but doesn't interrupt service
+- Preemptive: Higher priority can interrupt lower priority service
+- Automatic starvation prevention (low priority still gets served)
+- Based on Kleinrock (1975) priority queueing theory
+
+### 8. Finite Capacity Queues (M/M/N/K with Blocking)
+```python
+from src.core.config import FiniteCapacityConfig
+from src.models.finite_capacity_queue import (
+    run_finite_capacity_simulation,
+    ErlangBAnalytical,
+    compare_with_analytical
+)
+
+# Configure finite capacity queue
+config = FiniteCapacityConfig(
+    arrival_rate=100.0,     # Can exceed N·μ (system stays stable!)
+    num_threads=10,
+    service_rate=10.0,
+    max_capacity=30,        # K = 30 (total system capacity)
+    blocking_strategy='reject',  # Reject when full
+    sim_duration=200.0,
+    warmup_time=20.0,
+    random_seed=42
+)
+
+# Run simulation
+results = run_finite_capacity_simulation(config)
+
+print(f"Total arrivals: {results['total_arrivals']}")
+print(f"Blocked: {results['blocked']}")
+print(f"Blocking probability: {results['blocking_probability']:.4f}")
+print(f"Mean wait (accepted): {results['mean_wait']:.6f} sec")
+
+# Compare with Erlang-B analytical formula
+analytical = ErlangBAnalytical(
+    arrival_rate=100.0,
+    num_servers=10,
+    service_rate=10.0,
+    max_capacity=30
+)
+
+p_block = analytical.blocking_probability_finite_k()
+throughput = analytical.throughput()
+
+print(f"Analytical blocking: {p_block:.4f}")
+print(f"Effective throughput: {throughput:.1f} msg/sec")
+
+# Compare simulation vs analytical
+compare_with_analytical(config, results)
+
+# Test overload scenario (λ > N·μ)
+# System remains STABLE due to blocking (unlike M/M/N)
+config_overload = FiniteCapacityConfig(
+    arrival_rate=150.0,     # ρ = 1.5 (would be unstable for M/M/N)
+    num_threads=10,
+    service_rate=10.0,
+    max_capacity=40,
+    blocking_strategy='reject',
+    sim_duration=300.0,
+    warmup_time=50.0
+)
+
+# System stays stable, ~40-50% blocking probability
+results_overload = run_finite_capacity_simulation(config_overload)
+```
+
+**Key Features:**
+- Maximum system capacity K (including messages in service)
+- Blocking when system is full (Erlang-B behavior)
+- **Always stable** even when λ > N·μ (blocking prevents overflow)
+- Analytical formulas: Erlang-B (K=N) and M/M/N/K (K>N)
+- Effective arrival rate: λ_eff = λ × (1 - P_blocking)
+- Kendall notation: M/M/N/K
+
+**Use Cases:**
+- Admission control (reject requests when overloaded)
+- Bounded queues (prevent memory overflow)
+- Load shedding (graceful degradation under overload)
 
 ## Course Concept Integration
 

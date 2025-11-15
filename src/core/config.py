@@ -43,7 +43,15 @@ class QueueConfig(BaseModel):
     @field_validator('service_rate')
     @classmethod
     def check_stability(cls, v, info):
-        """Ensure system is stable (ρ < 1)"""
+        """Ensure system is stable (ρ < 1)
+
+        Note: This check is skipped for FiniteCapacityConfig since finite
+        capacity queues are always stable (blocking prevents overflow).
+        """
+        # Skip stability check for finite capacity queues
+        if cls.__name__ == 'FiniteCapacityConfig':
+            return v
+
         data = info.data
         if 'arrival_rate' in data and 'num_threads' in data:
             rho = data['arrival_rate'] / (data['num_threads'] * v)
@@ -218,17 +226,6 @@ class FiniteCapacityConfig(QueueConfig):
         default="reject",
         description="What to do when queue is full: reject or wait for space"
     )
-
-    @field_validator('service_rate')
-    @classmethod
-    def skip_stability_check(cls, v, info):
-        """
-        Finite capacity queues don't need stability check
-
-        With finite capacity, the system is always stable even if λ > N·μ
-        (arrivals are simply blocked when full)
-        """
-        return v
 
     @property
     def max_queue_length(self) -> int:
