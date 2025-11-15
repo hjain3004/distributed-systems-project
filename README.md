@@ -3,11 +3,13 @@
 **Heavy-Tailed Workloads, Threading Models, and Distributed Systems Protocols**
 
 This project extends queueing theory research to model cloud-based message broker performance with:
-- Heavy-tailed service time distributions (M/G/N, M/Ek/N models)
-- Explicit threading architecture modeling (dedicated vs shared)
-- 15 derived performance equations with rigorous validation
-- Distributed systems protocols (Raft, Vector Clocks, Two-Phase Commit)
-- Discrete-event simulation using SimPy with statistical rigor (20+ replications)
+- **Heavy-tailed service time distributions** (M/G/N, M/Ek/N models)
+- **Explicit threading architecture modeling** (dedicated vs shared)
+- **15 derived performance equations** with rigorous validation
+- **Advanced M/G/N approximations** (Whitt, Allen-Cunneen methods)
+- **Extreme condition testing** (ρ > 0.95, α < 2, cascade failures)
+- **Distributed systems protocols** (Raft, Vector Clocks, Two-Phase Commit)
+- **Discrete-event simulation** using SimPy with statistical rigor (20+ replications)
 
 ## Project Overview
 
@@ -15,9 +17,13 @@ Based on research by Li et al. (2015) on cloud message queueing services, this p
 1. **Heavy-tailed distributions**: Pareto (with Erlang for reduced variance)
 2. **Threading models**: Dedicated (thread-per-connection) vs Shared (worker pool)
 3. **Analytical framework**: 15 equations covering M/M/N, M/G/N, M/Ek/N, and threading models
-4. **Distributed protocols**: Raft consensus, Vector clocks, Two-Phase Commit (2PC)
-5. **Cloud broker features**: Visibility timeout, replication, message ordering
-6. **Comprehensive validation**: 29 unit tests, multiple experiments, analytical comparisons
+4. **Advanced approximations**: Whitt (1993) and Allen-Cunneen methods for M/G/N queues
+5. **Extreme condition testing**: High utilization (ρ > 0.95), infinite variance (α < 2), cascade failures
+6. **Priority queues**: M/M/N with multiple priority classes (preemptive & non-preemptive scheduling)
+7. **Finite capacity**: M/M/N/K with Erlang-B blocking formulas and admission control
+8. **Distributed protocols**: Raft consensus, Vector clocks, Two-Phase Commit (2PC)
+9. **Cloud broker features**: Visibility timeout, replication, message ordering
+10. **Comprehensive validation**: 63 unit tests (8 priority queue + 16 finite capacity + 10 extreme + 29 core tests)
 
 ## Quick Start
 
@@ -43,7 +49,16 @@ pip3 install -r requirements.txt
 # Comprehensive test - run unit tests
 python3 -m pytest tests/ -v
 
-# Output: 29 tests PASSED in ~97 seconds
+# Output: 63 tests PASSED
+#   - 8 priority queue tests (test_priority_queues.py)
+#   - 16 finite capacity tests (test_finite_capacity.py)
+#   - 10 extreme condition tests (test_extreme_conditions.py)
+#   - 29 core tests (test_erlang.py, test_queueing_laws.py, etc.)
+
+# Run specific test suites
+python3 -m pytest tests/test_priority_queues.py -v     # Priority queues
+python3 -m pytest tests/test_finite_capacity.py -v     # Finite capacity
+python3 -m pytest tests/test_extreme_conditions.py -v  # Extreme conditions
 ```
 
 ### Run Basic Experiments
@@ -60,6 +75,9 @@ python3 experiments/distributed_systems_validation.py
 
 # Tandem queue (two-stage broker→receiver)
 python3 experiments/tandem_queue_validation.py
+
+# Comprehensive paper validation with value-by-value comparison
+python3 experiments/generate_validation_table.py
 ```
 
 ### Expected Output
@@ -221,7 +239,56 @@ print(f"Mean waiting time: {metrics['mean_waiting_time']:.6f} sec")
 print(f"Mean queue length: {metrics['mean_queue_length']:.2f}")
 ```
 
-### 4. Simulation Models
+### 4. Advanced M/G/N Approximations
+```python
+from src.analysis.analytical import MGNAnalytical
+
+# Heavy-tailed M/G/N queue
+analytical = MGNAnalytical(
+    arrival_rate=80.0,
+    num_threads=10,
+    mean_service=0.1,
+    variance_service=0.05
+)
+
+# Compare three approximation methods
+comparison = analytical.compare_approximations(simulation_wq=0.15)
+
+print(f"Kingman approximation:      {comparison['kingman']:.6f}")
+print(f"Whitt approximation:        {comparison['whitt']:.6f}")
+print(f"Allen-Cunneen approximation: {comparison['allen_cunneen']:.6f}")
+print(f"Best method: {comparison['best_approximation']}")
+
+# At high utilization (ρ > 0.8), Whitt and Allen-Cunneen
+# outperform the basic Kingman approximation
+```
+
+### 5. Extreme Condition Testing
+```python
+# Test near saturation (ρ = 0.95)
+config = MMNConfig(
+    arrival_rate=95.0,  # Very high arrival rate
+    num_threads=10,
+    service_rate=10.0,
+    sim_duration=500.0,  # Longer simulation for extreme cases
+    warmup_time=200.0
+)
+
+# Test infinite variance (α < 2)
+config = MGNConfig(
+    arrival_rate=30.0,
+    num_threads=10,
+    service_rate=10.0,
+    distribution="pareto",
+    alpha=1.9,  # Infinite variance!
+    sim_duration=1000.0
+)
+
+# Test cascade failures in tandem queues
+# Stage 2 sees amplified traffic: Λ₂ = λ/(1-p)
+```
+
+### 6. Simulation Models
 ```python
 from src.models.mmn_queue import run_mmn_simulation
 
@@ -232,6 +299,133 @@ stats = metrics.summary_statistics()
 print(f"Simulated mean wait: {stats['mean_wait']:.6f} sec")
 print(f"P99 response time: {stats['p99_response']:.6f} sec")
 ```
+
+### 7. Priority Queues (M/M/N with Multiple Priority Classes)
+```python
+from src.core.config import PriorityQueueConfig
+from src.models.priority_queue import run_priority_queue_simulation, compare_priority_classes
+
+# Configure priority queue with 3 priority classes
+config = PriorityQueueConfig(
+    arrival_rate=75.0,      # Total arrival rate
+    num_threads=8,
+    service_rate=10.0,
+    num_priorities=3,
+    priority_rates=[20.0, 30.0, 25.0],  # Per-priority arrival rates (High, Med, Low)
+    preemptive=False,       # Non-preemptive scheduling
+    sim_duration=200.0,
+    warmup_time=50.0,
+    random_seed=42
+)
+
+# Run simulation
+results = run_priority_queue_simulation(config)
+
+# Compare priority classes
+compare_priority_classes(results)
+
+# Output:
+# Priority 1 (highest): mean_wait = 0.014s, P99 = 0.47s
+# Priority 2 (medium):  mean_wait = 0.038s, P99 = 0.54s
+# Priority 3 (lowest):  mean_wait = 0.376s, P99 = 2.76s
+
+# Test preemptive scheduling
+config_preempt = PriorityQueueConfig(
+    arrival_rate=60.0,
+    num_threads=8,
+    service_rate=10.0,
+    num_priorities=2,
+    priority_rates=[40.0, 20.0],
+    preemptive=True,  # Higher priority can interrupt service
+    sim_duration=200.0,
+    warmup_time=50.0
+)
+
+# Preemptive gives even better service to high priority
+# Priority 1: mean_wait = 0.001s (vs 0.011s non-preemptive)
+```
+
+**Key Features:**
+- Multiple priority classes (1 = highest priority)
+- Non-preemptive: Higher priority jumps queue but doesn't interrupt service
+- Preemptive: Higher priority can interrupt lower priority service
+- Automatic starvation prevention (low priority still gets served)
+- Based on Kleinrock (1975) priority queueing theory
+
+### 8. Finite Capacity Queues (M/M/N/K with Blocking)
+```python
+from src.core.config import FiniteCapacityConfig
+from src.models.finite_capacity_queue import (
+    run_finite_capacity_simulation,
+    ErlangBAnalytical,
+    compare_with_analytical
+)
+
+# Configure finite capacity queue
+config = FiniteCapacityConfig(
+    arrival_rate=100.0,     # Can exceed N·μ (system stays stable!)
+    num_threads=10,
+    service_rate=10.0,
+    max_capacity=30,        # K = 30 (total system capacity)
+    blocking_strategy='reject',  # Reject when full
+    sim_duration=200.0,
+    warmup_time=20.0,
+    random_seed=42
+)
+
+# Run simulation
+results = run_finite_capacity_simulation(config)
+
+print(f"Total arrivals: {results['total_arrivals']}")
+print(f"Blocked: {results['blocked']}")
+print(f"Blocking probability: {results['blocking_probability']:.4f}")
+print(f"Mean wait (accepted): {results['mean_wait']:.6f} sec")
+
+# Compare with Erlang-B analytical formula
+analytical = ErlangBAnalytical(
+    arrival_rate=100.0,
+    num_servers=10,
+    service_rate=10.0,
+    max_capacity=30
+)
+
+p_block = analytical.blocking_probability_finite_k()
+throughput = analytical.throughput()
+
+print(f"Analytical blocking: {p_block:.4f}")
+print(f"Effective throughput: {throughput:.1f} msg/sec")
+
+# Compare simulation vs analytical
+compare_with_analytical(config, results)
+
+# Test overload scenario (λ > N·μ)
+# System remains STABLE due to blocking (unlike M/M/N)
+config_overload = FiniteCapacityConfig(
+    arrival_rate=150.0,     # ρ = 1.5 (would be unstable for M/M/N)
+    num_threads=10,
+    service_rate=10.0,
+    max_capacity=40,
+    blocking_strategy='reject',
+    sim_duration=300.0,
+    warmup_time=50.0
+)
+
+# System stays stable, ~40-50% blocking probability
+results_overload = run_finite_capacity_simulation(config_overload)
+```
+
+**Key Features:**
+- Maximum system capacity K (including messages in service)
+- Blocking when system is full (Erlang-B behavior)
+- **Always stable** even when λ > N·μ (blocking prevents overflow)
+- Analytical formulas: Erlang-B (K=N) and M/M/N/K (K>N)
+- Effective arrival rate: λ_eff = λ × (1 - P_blocking)
+- Kendall notation: M/M/N/K
+
+**Use Cases:**
+- Admission control (reject requests when overloaded)
+- Bounded queues (prevent memory overflow)
+- Load shedding (graceful degradation under overload)
 
 ## Course Concept Integration
 
@@ -252,12 +446,17 @@ This project demonstrates key distributed systems concepts:
 1. **Heavy-tailed workloads**: Their model assumes exponential service times; we add Pareto, lognormal, and Weibull
 2. **Threading models**: Explicit modeling of dedicated vs shared threading (from course Ch. 7)
 3. **Analytical framework**: 15 equations vs their basic queueing model
-4. **Validation**: Comprehensive simulation-based validation
+4. **Advanced M/G/N approximations**: Implemented Whitt (1993) and Allen-Cunneen methods for better accuracy at high utilization
+5. **Extreme condition testing**: Tests with ρ > 0.95, α < 2 (infinite variance), and cascade failure scenarios
+6. **Validation**: Comprehensive simulation-based validation with value-by-value comparison against paper
 
 ### Key Findings (from experiments):
 - Heavy tails (α=2.1) increase P99 latency by ~50% vs exponential
 - Shared threading has 10-15% overhead but supports unlimited connections
 - Dedicated threading: higher performance, limited to Nthreads/2 connections
+- **NEW**: At ρ > 0.8, Whitt/Allen-Cunneen approximations outperform basic Kingman method
+- **NEW**: Systems remain stable but with extreme queueing even at ρ = 0.99
+- **NEW**: With α < 2 (infinite variance), P99/mean ratio exceeds 30x (vs 3x for exponential)
 
 ## Tandem Queue Model (Li et al. 2015)
 
