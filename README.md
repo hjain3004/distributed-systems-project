@@ -19,9 +19,11 @@ Based on research by Li et al. (2015) on cloud message queueing services, this p
 3. **Analytical framework**: 15 equations covering M/M/N, M/G/N, M/Ek/N, and threading models
 4. **Advanced approximations**: Whitt (1993) and Allen-Cunneen methods for M/G/N queues
 5. **Extreme condition testing**: High utilization (ρ > 0.95), infinite variance (α < 2), cascade failures
-6. **Distributed protocols**: Raft consensus, Vector clocks, Two-Phase Commit (2PC)
-7. **Cloud broker features**: Visibility timeout, replication, message ordering
-8. **Comprehensive validation**: 39 unit tests (including 10 extreme condition tests), analytical comparisons
+6. **Priority queues**: Multiple priority classes with configurable scheduling (config ready)
+7. **Finite capacity**: M/M/N/K with blocking and admission control (config ready)
+8. **Distributed protocols**: Raft consensus, Vector clocks, Two-Phase Commit (2PC)
+9. **Cloud broker features**: Visibility timeout, replication, message ordering
+10. **Comprehensive validation**: 39 unit tests (including 10 extreme condition tests), analytical comparisons
 
 ## Quick Start
 
