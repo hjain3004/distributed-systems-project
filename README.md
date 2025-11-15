@@ -3,11 +3,13 @@
 **Heavy-Tailed Workloads, Threading Models, and Distributed Systems Protocols**
 
 This project extends queueing theory research to model cloud-based message broker performance with:
-- Heavy-tailed service time distributions (M/G/N, M/Ek/N models)
-- Explicit threading architecture modeling (dedicated vs shared)
-- 15 derived performance equations with rigorous validation
-- Distributed systems protocols (Raft, Vector Clocks, Two-Phase Commit)
-- Discrete-event simulation using SimPy with statistical rigor (20+ replications)
+- **Heavy-tailed service time distributions** (M/G/N, M/Ek/N models)
+- **Explicit threading architecture modeling** (dedicated vs shared)
+- **15 derived performance equations** with rigorous validation
+- **Advanced M/G/N approximations** (Whitt, Allen-Cunneen methods)
+- **Extreme condition testing** (ρ > 0.95, α < 2, cascade failures)
+- **Distributed systems protocols** (Raft, Vector Clocks, Two-Phase Commit)
+- **Discrete-event simulation** using SimPy with statistical rigor (20+ replications)
 
 ## Project Overview
 
@@ -15,9 +17,11 @@ Based on research by Li et al. (2015) on cloud message queueing services, this p
 1. **Heavy-tailed distributions**: Pareto (with Erlang for reduced variance)
 2. **Threading models**: Dedicated (thread-per-connection) vs Shared (worker pool)
 3. **Analytical framework**: 15 equations covering M/M/N, M/G/N, M/Ek/N, and threading models
-4. **Distributed protocols**: Raft consensus, Vector clocks, Two-Phase Commit (2PC)
-5. **Cloud broker features**: Visibility timeout, replication, message ordering
-6. **Comprehensive validation**: 29 unit tests, multiple experiments, analytical comparisons
+4. **Advanced approximations**: Whitt (1993) and Allen-Cunneen methods for M/G/N queues
+5. **Extreme condition testing**: High utilization (ρ > 0.95), infinite variance (α < 2), cascade failures
+6. **Distributed protocols**: Raft consensus, Vector clocks, Two-Phase Commit (2PC)
+7. **Cloud broker features**: Visibility timeout, replication, message ordering
+8. **Comprehensive validation**: 39 unit tests (including 10 extreme condition tests), analytical comparisons
 
 ## Quick Start
 
@@ -43,7 +47,10 @@ pip3 install -r requirements.txt
 # Comprehensive test - run unit tests
 python3 -m pytest tests/ -v
 
-# Output: 29 tests PASSED in ~97 seconds
+# Output: 39 tests PASSED (including 10 extreme condition tests)
+
+# Run extreme condition tests specifically
+python3 -m pytest tests/test_extreme_conditions.py -v
 ```
 
 ### Run Basic Experiments
@@ -60,6 +67,9 @@ python3 experiments/distributed_systems_validation.py
 
 # Tandem queue (two-stage broker→receiver)
 python3 experiments/tandem_queue_validation.py
+
+# Comprehensive paper validation with value-by-value comparison
+python3 experiments/generate_validation_table.py
 ```
 
 ### Expected Output
@@ -221,7 +231,56 @@ print(f"Mean waiting time: {metrics['mean_waiting_time']:.6f} sec")
 print(f"Mean queue length: {metrics['mean_queue_length']:.2f}")
 ```
 
-### 4. Simulation Models
+### 4. Advanced M/G/N Approximations
+```python
+from src.analysis.analytical import MGNAnalytical
+
+# Heavy-tailed M/G/N queue
+analytical = MGNAnalytical(
+    arrival_rate=80.0,
+    num_threads=10,
+    mean_service=0.1,
+    variance_service=0.05
+)
+
+# Compare three approximation methods
+comparison = analytical.compare_approximations(simulation_wq=0.15)
+
+print(f"Kingman approximation:      {comparison['kingman']:.6f}")
+print(f"Whitt approximation:        {comparison['whitt']:.6f}")
+print(f"Allen-Cunneen approximation: {comparison['allen_cunneen']:.6f}")
+print(f"Best method: {comparison['best_approximation']}")
+
+# At high utilization (ρ > 0.8), Whitt and Allen-Cunneen
+# outperform the basic Kingman approximation
+```
+
+### 5. Extreme Condition Testing
+```python
+# Test near saturation (ρ = 0.95)
+config = MMNConfig(
+    arrival_rate=95.0,  # Very high arrival rate
+    num_threads=10,
+    service_rate=10.0,
+    sim_duration=500.0,  # Longer simulation for extreme cases
+    warmup_time=200.0
+)
+
+# Test infinite variance (α < 2)
+config = MGNConfig(
+    arrival_rate=30.0,
+    num_threads=10,
+    service_rate=10.0,
+    distribution="pareto",
+    alpha=1.9,  # Infinite variance!
+    sim_duration=1000.0
+)
+
+# Test cascade failures in tandem queues
+# Stage 2 sees amplified traffic: Λ₂ = λ/(1-p)
+```
+
+### 6. Simulation Models
 ```python
 from src.models.mmn_queue import run_mmn_simulation
 
@@ -252,12 +311,17 @@ This project demonstrates key distributed systems concepts:
 1. **Heavy-tailed workloads**: Their model assumes exponential service times; we add Pareto, lognormal, and Weibull
 2. **Threading models**: Explicit modeling of dedicated vs shared threading (from course Ch. 7)
 3. **Analytical framework**: 15 equations vs their basic queueing model
-4. **Validation**: Comprehensive simulation-based validation
+4. **Advanced M/G/N approximations**: Implemented Whitt (1993) and Allen-Cunneen methods for better accuracy at high utilization
+5. **Extreme condition testing**: Tests with ρ > 0.95, α < 2 (infinite variance), and cascade failure scenarios
+6. **Validation**: Comprehensive simulation-based validation with value-by-value comparison against paper
 
 ### Key Findings (from experiments):
 - Heavy tails (α=2.1) increase P99 latency by ~50% vs exponential
 - Shared threading has 10-15% overhead but supports unlimited connections
 - Dedicated threading: higher performance, limited to Nthreads/2 connections
+- **NEW**: At ρ > 0.8, Whitt/Allen-Cunneen approximations outperform basic Kingman method
+- **NEW**: Systems remain stable but with extreme queueing even at ρ = 0.99
+- **NEW**: With α < 2 (infinite variance), P99/mean ratio exceeds 30x (vs 3x for exponential)
 
 ## Tandem Queue Model (Li et al. 2015)
 

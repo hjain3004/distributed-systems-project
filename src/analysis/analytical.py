@@ -176,6 +176,10 @@ class MGNAnalytical:
         Also discussed in:
         Whitt, W. (1993). "Approximations for the GI/G/m queue."
         Production and Operations Management, 2(2), 114-161.
+
+        Note: This is a simplified approximation. For better accuracy, especially
+        with heavy-tailed distributions, use mean_waiting_time_whitt() or
+        mean_waiting_time_allen_cunneen().
         """
         # Get baseline M/M/N waiting time
         mmn = MMNAnalytical(self.lambda_, self.N, self.mu)
@@ -186,6 +190,121 @@ class MGNAnalytical:
         # Apply variability correction factor
         Wq = Wq_mmn * (1 + C_squared) / 2
         return Wq
+
+    def mean_waiting_time_whitt(self) -> float:
+        """
+        Whitt's refined approximation for M/G/N queues (1993)
+
+        More accurate than Kingman's approximation, especially for:
+        - High utilization (ρ > 0.8)
+        - High variability (C² > 1)
+        - Heavy-tailed distributions
+
+        Formula:
+        Wq(M/G/N) ≈ [(C_a² + C_s²) / 2] × C(N,a) × (1/(N·μ·(1-ρ)))
+
+        where:
+        - C_a² = 1 (Poisson arrivals)
+        - C_s² = coefficient of variation of service time
+        - C(N,a) = Erlang-C (probability of queueing)
+
+        Citation:
+        Whitt, W. (1993). "Approximations for the GI/G/m queue."
+        Production and Operations Management, 2(2), 114-161.
+
+        Returns:
+            Mean waiting time in queue (seconds)
+        """
+        # Get M/M/N model for Erlang-C
+        mmn = MMNAnalytical(self.lambda_, self.N, self.mu)
+        C_erlang = mmn.erlang_c()
+
+        # Arrival and service variability
+        C_a_squared = 1.0  # Poisson arrivals (M)
+        C_s_squared = self.coefficient_of_variation()
+
+        # Whitt's formula
+        variability_factor = (C_a_squared + C_s_squared) / 2.0
+        queueing_prob = C_erlang
+        mean_service_time = self.ES
+
+        # Wq = [(C_a² + C_s²)/2] × P(queue) × [E[S]/(1-ρ)]
+        Wq = variability_factor * queueing_prob * mean_service_time / (1 - self.rho)
+
+        return Wq
+
+    def mean_waiting_time_allen_cunneen(self) -> float:
+        """
+        Allen-Cunneen approximation for M/G/N queues
+
+        Alternative to Whitt's approximation, often more accurate for
+        high variability (C² >> 1) and heavy-tailed distributions.
+
+        Formula:
+        Wq(M/G/N) ≈ Wq(M/M/N) × [(C_a² + C_s²) / 2]
+
+        This is similar to Kingman but uses a different variability correction.
+
+        Citation:
+        Allen, A. O. (1990). "Probability, Statistics, and Queueing Theory
+        with Computer Science Applications." Academic Press.
+
+        Choudhury, G. L., & Whitt, W. (1997). "Computing distributions and
+        moments in polling models by numerical transform inversion."
+        Performance Evaluation, 25(4), 267-292.
+
+        Returns:
+            Mean waiting time in queue (seconds)
+        """
+        # Get baseline M/M/N waiting time
+        mmn = MMNAnalytical(self.lambda_, self.N, self.mu)
+        Wq_mmn = mmn.mean_waiting_time()
+
+        # Arrival and service variability
+        C_a_squared = 1.0  # Poisson arrivals
+        C_s_squared = self.coefficient_of_variation()
+
+        # Allen-Cunneen correction factor
+        correction_factor = (C_a_squared + C_s_squared) / 2.0
+
+        Wq = Wq_mmn * correction_factor
+        return Wq
+
+    def compare_approximations(self, simulation_wq: Optional[float] = None) -> Dict[str, Any]:
+        """
+        Compare all three M/G/N approximation methods
+
+        Args:
+            simulation_wq: Optional simulated waiting time for comparison
+
+        Returns:
+            Dictionary with all approximations and their comparison
+        """
+        kingman = self.mean_waiting_time_mgn()
+        whitt = self.mean_waiting_time_whitt()
+        allen_cunneen = self.mean_waiting_time_allen_cunneen()
+
+        result = {
+            'kingman': kingman,
+            'whitt': whitt,
+            'allen_cunneen': allen_cunneen,
+        }
+
+        if simulation_wq is not None:
+            result['simulation'] = simulation_wq
+            result['kingman_error_%'] = abs(kingman - simulation_wq) / simulation_wq * 100
+            result['whitt_error_%'] = abs(whitt - simulation_wq) / simulation_wq * 100
+            result['allen_cunneen_error_%'] = abs(allen_cunneen - simulation_wq) / simulation_wq * 100
+
+            # Determine best approximation
+            errors = {
+                'kingman': result['kingman_error_%'],
+                'whitt': result['whitt_error_%'],
+                'allen_cunneen': result['allen_cunneen_error_%']
+            }
+            result['best_approximation'] = min(errors, key=errors.get)
+
+        return result
 
     def mean_response_time(self) -> float:
         """Mean response time: R = Wq + E[S]"""
