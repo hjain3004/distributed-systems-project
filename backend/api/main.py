@@ -9,7 +9,7 @@ from fastapi.responses import JSONResponse
 import uvicorn
 
 # Import routes
-from api.routes import simulations, analytical, distributed, results
+from .routes import simulations, analytical, distributed, results
 
 # Create FastAPI app
 app = FastAPI(
@@ -24,10 +24,8 @@ app = FastAPI(
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
-        "http://localhost:3000",  # React dev server
-        "http://localhost:5173",  # Vite dev server (alternative)
-        "http://127.0.0.1:3000",
-        "http://127.0.0.1:5173",
+        "http://localhost:4000",  # Vite dev server
+        "http://127.0.0.1:4000",
     ],
     allow_credentials=True,
     allow_methods=["*"],
@@ -66,7 +64,7 @@ if __name__ == "__main__":
     uvicorn.run(
         "main:app",
         host="0.0.0.0",
-        port=8000,
+        port=6000,
         reload=True,  # Auto-reload during development
         log_level="info"
     )
