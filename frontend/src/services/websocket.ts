@@ -4,7 +4,7 @@
  */
 
 import { io, Socket } from 'socket.io-client';
-import type { WebSocketMessage } from '@types/models';
+import type { WebSocketMessage } from '../types/models';
 
 const WS_URL = import.meta.env.VITE_WS_URL || 'http://localhost:8000';
 

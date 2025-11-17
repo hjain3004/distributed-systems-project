@@ -16,7 +16,7 @@ import type {
   VectorClockRequest,
   TwoPhaseCommitRequest,
   DistributedSimulationResponse,
-} from '@types/models';
+} from '../types/models';
 
 // Create axios instance with base configuration
 const api: AxiosInstance = axios.create({
