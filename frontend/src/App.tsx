@@ -1,11 +1,12 @@
 /**
  * Main Application Component
- * Simple version to test basic setup
+ * Now with API connection testing
  */
 
 import { ThemeProvider, CssBaseline } from '@mui/material';
 import { Box, Container, Typography, Paper } from '@mui/material';
 import { theme } from './utils/theme';
+import { ApiTest } from './components/ApiTest';
 
 function App() {
   return (
@@ -24,6 +25,7 @@ function App() {
             sx={{
               p: 4,
               textAlign: 'center',
+              mb: 3,
             }}
           >
             <Typography variant="h2" gutterBottom color="primary">
@@ -39,9 +41,12 @@ function App() {
               ✅ Material-UI Theme
             </Typography>
             <Typography variant="body1">
-              ✅ Frontend Foundation Ready!
+              ✅ Backend API Connected!
             </Typography>
           </Paper>
+
+          {/* API Connection Test */}
+          <ApiTest />
         </Container>
       </Box>
     </ThemeProvider>
