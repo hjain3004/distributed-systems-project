@@ -20,11 +20,11 @@ export default defineConfig({
     port: 4000,
     proxy: {
       '/api': {
-        target: 'http://localhost:6000',
+        target: 'http://localhost:3000',
         changeOrigin: true,
       },
       '/ws': {
-        target: 'ws://localhost:6000',
+        target: 'ws://localhost:3000',
         ws: true,
       },
     },
