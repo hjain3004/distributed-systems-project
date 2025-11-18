@@ -178,7 +178,7 @@ export const MGNCalculator = () => {
             />
           </Grid>
           <Grid item xs={12} md={6}>
-            <Typography gutterBottom fontWeight="bold">
+            <Typography gutterBottom fontWeight="bold" component="div">
               Pareto Shape (α): {alpha}
               {alpha <= 2 && <Chip label="⚠ Infinite variance!" color="error" size="small" sx={{ ml: 1 }} />}
             </Typography>
