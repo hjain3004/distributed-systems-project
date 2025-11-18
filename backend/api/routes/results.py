@@ -10,6 +10,12 @@ import json
 import csv
 import io
 from datetime import datetime
+import sys
+import os
+
+# Add backend directory to path
+backend_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+sys.path.append(backend_dir)
 
 from api.services.simulation_service import SimulationService
 

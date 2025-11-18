@@ -203,7 +203,7 @@ export const MGNvsMMNComparison = () => {
             />
           </Grid>
           <Grid item xs={12} md={6}>
-            <Typography gutterBottom>
+            <Typography gutterBottom component="div">
               Pareto Shape (α): {alpha}
               {alpha <= 2 && <Chip label="⚠ Infinite variance!" color="error" size="small" sx={{ ml: 1 }} />}
               {alpha > 2 && <Chip label={`C² = ${cv2.toFixed(2)}`} color="info" size="small" sx={{ ml: 1 }} />}

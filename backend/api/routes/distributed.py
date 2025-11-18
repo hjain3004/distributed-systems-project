@@ -8,7 +8,11 @@ from typing import Dict, Any
 import uuid
 from datetime import datetime
 import sys
+import os
+# Add both project root and backend directory to path
 sys.path.append('/home/user/distributed-systems-project')
+backend_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+sys.path.append(backend_dir)
 
 from api.models.distributed_models import (
     RaftRequest,
