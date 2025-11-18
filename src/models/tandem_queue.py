@@ -112,11 +112,12 @@ class TandemQueueSystem:
         self.broker_threads = simpy.Resource(env, capacity=config.n1)
         self.broker_service_rate = config.mu1
 
-        # Network Layer
+        # Network Layer (with callback for Stage 2 arrival tracking)
         self.network = NetworkLayer(
             env=env,
             network_delay=config.network_delay,
-            failure_probability=config.failure_prob
+            failure_probability=config.failure_prob,
+            on_transmission_attempt=self._on_stage2_arrival_attempt
         )
 
         # Stage 2: Receiver
@@ -129,6 +130,16 @@ class TandemQueueSystem:
         # Message counter
         self.message_id = 0
         self.messages_in_warmup = 0
+
+    def _on_stage2_arrival_attempt(self, message_id, attempt_num):
+        """
+        Callback when a transmission attempt is made to Stage 2.
+        This tracks the TOTAL arrival rate at Stage 2, including retries.
+        This is what makes Λ₂ = λ/(1-p) instead of just λ.
+        """
+        if not self.is_warmup():
+            # Record each transmission attempt as a Stage 2 arrival
+            self.metrics.stage2_arrivals.append(self.env.now)
 
     def is_warmup(self) -> bool:
         """Check if in warmup period"""
@@ -182,9 +193,9 @@ class TandemQueueSystem:
         # === STAGE 2: RECEIVER ===
         stage2_arrival = self.env.now
 
-        # Record arrival at Stage 2
-        if not self.is_warmup():
-            self.metrics.stage2_arrivals.append(stage2_arrival)
+        # Note: Stage 2 arrivals are now tracked in _on_stage2_arrival_attempt callback
+        # This happens during network transmission attempts (including retries)
+        # So Λ₂ = λ/(1-p) is correctly measured
 
         # Wait in receiver queue
         with self.receiver_threads.request() as req:

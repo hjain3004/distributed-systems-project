@@ -51,18 +51,21 @@ class NetworkLayer:
     def __init__(self, env: simpy.Environment,
                  network_delay: float,
                  failure_probability: float,
-                 max_retries: int = 10):
+                 max_retries: int = 10,
+                 on_transmission_attempt=None):
         """
         Args:
             env: SimPy environment
             network_delay: One-way network delay D_link (seconds)
             failure_probability: Probability p of transmission failure (0 ≤ p < 1)
             max_retries: Maximum retransmission attempts
+            on_transmission_attempt: Optional callback(message_id, attempt_num) called for each transmission attempt
         """
         self.env = env
         self.network_delay = network_delay
         self.failure_probability = failure_probability
         self.max_retries = max_retries
+        self.on_transmission_attempt = on_transmission_attempt
 
         # Metrics
         self.metrics = NetworkMetrics()
@@ -81,6 +84,10 @@ class NetworkLayer:
             yield self.env.timeout(self.network_delay)
 
             self.metrics.total_transmissions += 1
+
+            # Notify callback of transmission attempt (for Stage 2 arrival tracking)
+            if self.on_transmission_attempt is not None:
+                self.on_transmission_attempt(message_id, retries)
 
             # Check if transmission succeeds
             if np.random.random() > self.failure_probability:
