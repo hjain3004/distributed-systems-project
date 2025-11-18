@@ -6,8 +6,10 @@ Runs the complete analytical and simulation API
 import sys
 import os
 
-# Add project root to path
+# Add project root and backend directory to path
 sys.path.insert(0, '/home/user/distributed-systems-project')
+backend_dir = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, backend_dir)
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware

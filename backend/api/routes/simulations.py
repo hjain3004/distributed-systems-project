@@ -13,7 +13,11 @@ import uuid
 
 # Import existing simulation modules
 import sys
+import os
+# Add both project root and backend directory to path
 sys.path.append('/home/user/distributed-systems-project')
+backend_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+sys.path.append(backend_dir)
 
 from src.core.config import MMNConfig, MGNConfig, TandemQueueConfig
 from src.models.mmn_queue import run_mmn_simulation
