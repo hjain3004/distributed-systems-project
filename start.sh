@@ -13,14 +13,14 @@ pkill -f "vite" 2>/dev/null || true
 sleep 1
 
 # Start backend
-echo "Starting backend on port 3000..."
+echo "Starting backend on port 3100..."
 nohup python3 backend/simple_main.py > /tmp/backend.log 2>&1 &
 BACKEND_PID=$!
 sleep 2
 
 # Check if backend started
-if curl -s http://localhost:3000/api/health > /dev/null 2>&1; then
-    echo "✅ Backend is running on http://localhost:3000"
+if curl -s http://localhost:3100/api/health > /dev/null 2>&1; then
+    echo "✅ Backend is running on http://localhost:3100"
 else
     echo "❌ Backend failed to start. Check /tmp/backend.log"
     exit 1
@@ -47,8 +47,8 @@ echo "🎉 All servers are running!"
 echo ""
 echo "📝 Access the application:"
 echo "   Frontend:  http://localhost:4000"
-echo "   Backend:   http://localhost:3000"
-echo "   API Docs:  http://localhost:3000/api/docs"
+echo "   Backend:   http://localhost:3100"
+echo "   API Docs:  http://localhost:3100/api/docs"
 echo ""
 echo "📋 To stop the servers:"
 echo "   ./stop.sh"
