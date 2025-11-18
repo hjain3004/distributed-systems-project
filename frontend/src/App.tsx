@@ -1,54 +1,37 @@
 /**
  * Main Application Component
- * Now with API connection testing
+ * Routing and layout configuration
  */
 
 import { ThemeProvider, CssBaseline } from '@mui/material';
-import { Box, Container, Typography, Paper } from '@mui/material';
+import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { theme } from './utils/theme';
-import { ApiTest } from './components/ApiTest';
+import { Layout } from './components/Layout';
+import { Dashboard } from './pages/Dashboard';
+import { MGNvsMMNComparison } from './pages/MGNvsMMNComparison';
+import { AllEquations } from './pages/AllEquations';
+import { MMNCalculator } from './pages/MMNCalculator';
+import { MGNCalculator } from './pages/MGNCalculator';
+import { TandemQueue } from './pages/TandemQueue';
+import { ResultsViewer } from './pages/ResultsViewer';
 
 function App() {
   return (
     <ThemeProvider theme={theme}>
       <CssBaseline />
-      <Box
-        sx={{
-          minHeight: '100vh',
-          backgroundColor: 'background.default',
-          py: 4,
-        }}
-      >
-        <Container maxWidth="lg">
-          <Paper
-            elevation={3}
-            sx={{
-              p: 4,
-              textAlign: 'center',
-              mb: 3,
-            }}
-          >
-            <Typography variant="h2" gutterBottom color="primary">
-              Distributed Systems Performance Modeling
-            </Typography>
-            <Typography variant="h5" color="text.secondary" gutterBottom>
-              Interactive Web Platform
-            </Typography>
-            <Typography variant="body1" sx={{ mt: 2 }}>
-              ✅ React + TypeScript + Vite
-            </Typography>
-            <Typography variant="body1">
-              ✅ Material-UI Theme
-            </Typography>
-            <Typography variant="body1">
-              ✅ Backend API Connected!
-            </Typography>
-          </Paper>
-
-          {/* API Connection Test */}
-          <ApiTest />
-        </Container>
-      </Box>
+      <BrowserRouter>
+        <Layout>
+          <Routes>
+            <Route path="/" element={<Dashboard />} />
+            <Route path="/comparison" element={<MGNvsMMNComparison />} />
+            <Route path="/mmn" element={<MMNCalculator />} />
+            <Route path="/mgn" element={<MGNCalculator />} />
+            <Route path="/tandem" element={<TandemQueue />} />
+            <Route path="/equations" element={<AllEquations />} />
+            <Route path="/results" element={<ResultsViewer />} />
+          </Routes>
+        </Layout>
+      </BrowserRouter>
     </ThemeProvider>
   );
 }

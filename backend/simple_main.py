@@ -1,16 +1,26 @@
 """
-Simplified FastAPI Backend - No external simulation imports
-Just health check and basic endpoints for testing
+FastAPI Backend with Full API Integration
+Runs the complete analytical and simulation API
 """
+
+import sys
+import os
+
+# Add project root to path
+sys.path.insert(0, '/home/user/distributed-systems-project')
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+import uvicorn
+
+# Import routes
+from backend.api.routes import simulations, analytical, distributed, results
 
 # Create FastAPI app
 app = FastAPI(
     title="Distributed Systems Performance Modeling API",
-    description="Backend API for queue modeling (simplified version)",
+    description="Backend API for queue modeling, analytical calculations, and distributed systems simulations",
     version="1.0.0",
     docs_url="/api/docs",
     redoc_url="/api/redoc"
@@ -28,6 +38,12 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Include routers
+app.include_router(simulations.router, prefix="/api/simulations", tags=["Simulations"])
+app.include_router(analytical.router, prefix="/api/analytical", tags=["Analytical"])
+app.include_router(distributed.router, prefix="/api/distributed", tags=["Distributed Systems"])
+app.include_router(results.router, prefix="/api/results", tags=["Results"])
+
 # Health check endpoint
 @app.get("/api/health")
 async def health_check():
@@ -36,7 +52,7 @@ async def health_check():
         "status": "healthy",
         "service": "Distributed Systems Performance Modeling API",
         "version": "1.0.0",
-        "message": "Backend is running!"
+        "message": "Full API with analytical endpoints active!"
     })
 
 # Root endpoint
@@ -47,26 +63,14 @@ async def root():
         "message": "Distributed Systems Performance Modeling API",
         "docs": "/api/docs",
         "health": "/api/health",
-        "version": "1.0.0"
-    })
-
-# Mock simulation endpoint for testing
-@app.post("/api/simulations/mmn")
-async def mock_mmn_simulation(config: dict):
-    """Mock M/M/N simulation for testing frontend"""
-    return JSONResponse(content={
-        "simulation_id": "test-123",
-        "status": "completed",
-        "model_type": "M/M/N",
-        "message": "Mock simulation (backend working!)",
-        "metrics": {
-            "mean_wait": 0.045,
-            "mean_response": 0.128,
-            "utilization": 0.833,
-            "p99_response": 0.456
+        "version": "1.0.0",
+        "endpoints": {
+            "analytical": "/api/analytical",
+            "simulations": "/api/simulations",
+            "distributed": "/api/distributed",
+            "results": "/api/results"
         }
     })
 
 if __name__ == "__main__":
-    import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=6000)
