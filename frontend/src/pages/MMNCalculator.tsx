@@ -51,7 +51,7 @@ export const MMNCalculator = () => {
     setError(null);
 
     try {
-      const response = await axios.post('http://localhost:6000/api/analytical/mmn', {
+      const response = await axios.post('/api/analytical/mmn', {
         arrival_rate: lambda,
         num_threads: N,
         service_rate: mu,
