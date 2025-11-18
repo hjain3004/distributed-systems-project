@@ -67,6 +67,30 @@ async def mock_mmn_simulation(config: dict):
         }
     })
 
+@app.post("/api/simulations/mgn")
+async def mock_mgn_simulation(config: dict):
+    """Mock M/G/N simulation for testing frontend"""
+    distribution = config.get("distribution", "pareto")
+    alpha = config.get("alpha", 2.5)
+
+    return JSONResponse(content={
+        "simulation_id": "test-mgn-456",
+        "status": "completed",
+        "model_type": "M/G/N",
+        "message": f"Mock M/G/N simulation with {distribution} distribution (backend working!)",
+        "config": {
+            "distribution": distribution,
+            "alpha": alpha
+        },
+        "metrics": {
+            "mean_wait": 0.125,
+            "mean_response": 0.208,
+            "utilization": 0.833,
+            "p99_response": 0.892,
+            "coefficient_of_variation": 1.0
+        }
+    })
+
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=6000)
+    uvicorn.run(app, host="0.0.0.0", port=3001)

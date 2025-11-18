@@ -10,6 +10,6 @@ pydantic==2.5.0           # Type-safe configs
 pytest==7.4.0             # Testing
 
 # Optional (for advanced features)
-queueing-tool==1.2.5      # Validation
+# queueing-tool==1.2.5      # Validation (commented out - compatibility issues on some platforms)
 mlflow==2.9.0             # Experiment tracking
 joblib==1.3.0             # Parallel execution
