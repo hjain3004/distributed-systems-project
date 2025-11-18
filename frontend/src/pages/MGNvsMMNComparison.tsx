@@ -68,7 +68,7 @@ export const MGNvsMMNComparison = () => {
 
     try {
       // Calculate M/M/N metrics
-      const mmnResponse = await axios.post('http://localhost:6000/api/analytical/mmn', {
+      const mmnResponse = await axios.post('/api/analytical/mmn', {
         arrival_rate: lambda,
         num_threads: N,
         service_rate: mu,
@@ -79,7 +79,7 @@ export const MGNvsMMNComparison = () => {
       const cv2 = 1 / (alpha * (alpha - 2)); // C² = 1/(α(α-2))
       const variance = cv2 * meanService * meanService;
 
-      const mgnResponse = await axios.post('http://localhost:6000/api/analytical/mgn', {
+      const mgnResponse = await axios.post('/api/analytical/mgn', {
         arrival_rate: lambda,
         num_threads: N,
         mean_service: meanService,
