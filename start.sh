@@ -14,7 +14,7 @@ sleep 1
 
 # Start backend
 echo "Starting backend on port 3000..."
-nohup python backend/simple_main.py > /tmp/backend.log 2>&1 &
+nohup python3 backend/simple_main.py > /tmp/backend.log 2>&1 &
 BACKEND_PID=$!
 sleep 2
 
