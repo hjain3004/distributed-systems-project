@@ -66,8 +66,11 @@ class TestTandemQueue:
     def test_stage2_arrival_rate(self):
         """
         Test Stage 2 arrival rate: Λ₂ = λ/(1-p)
-        
+
         Critical equation from Li et al. (2015)
+
+        Stage 2 should see HIGHER arrival rate than Stage 1 due to retransmissions.
+        Each failed transmission creates another arrival attempt at Stage 2.
         """
         config = TandemQueueConfig(
             arrival_rate=100,
@@ -83,27 +86,26 @@ class TestTandemQueue:
         # Run simulation
         results = run_tandem_simulation(config)
 
-        # Expected Stage 2 arrival rate
+        # Expected Stage 2 arrival rate (includes retransmissions!)
         lambda1 = config.arrival_rate
         p = config.failure_prob
-        Lambda2_expected = lambda1 / (1 - p)
+        Lambda2_expected = lambda1 / (1 - p)  # Should be 125 msg/sec
 
         # Simulated Stage 2 arrival rate
         Lambda2_simulated = results['stage2_arrival_rate']
 
-        # Should match within 25% (looser tolerance due to implementation details)
-        # Note: Simulation measures unique message arrivals at Stage 2,
-        # which equals λ (original rate), not λ/(1-p) (transmission attempts)
-        error_pct = abs(Lambda2_simulated - lambda1) / lambda1 * 100
+        # Should match within 15% (accounting for simulation variance)
+        error_pct = abs(Lambda2_simulated - Lambda2_expected) / Lambda2_expected * 100
 
         print(f"\nStage 2 Arrival Rate Test:")
-        print(f"  λ₁ = {lambda1}")
-        print(f"  p = {p}")
-        print(f"  Λ₂ (theoretical transmission rate) = λ/(1-p) = {Lambda2_expected:.2f}")
-        print(f"  Λ₂ (simulated unique arrivals) = {Lambda2_simulated:.2f}")
-        print(f"  Error from λ₁ = {error_pct:.2f}%")
+        print(f"  λ₁ (Stage 1 arrivals) = {lambda1} msg/sec")
+        print(f"  p (failure probability) = {p}")
+        print(f"  Λ₂ (expected) = λ/(1-p) = {Lambda2_expected:.2f} msg/sec")
+        print(f"  Λ₂ (simulated) = {Lambda2_simulated:.2f} msg/sec")
+        print(f"  Error = {error_pct:.2f}%")
+        print(f"\n  ✓ Stage 2 sees {Lambda2_simulated/lambda1:.2f}x more arrivals due to retries")
 
-        assert error_pct < 25, f"Stage 2 arrival rate deviates from λ: {error_pct:.2f}% error"
+        assert error_pct < 15, f"Stage 2 arrival rate Λ₂ = λ/(1-p) violated: {error_pct:.2f}% error"
 
     def test_network_time_formula(self):
         """
