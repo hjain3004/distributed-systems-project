@@ -99,6 +99,54 @@ async def mock_mgn_simulation(config: dict):
         }
     })
 
+# Analytical endpoints
+@app.post("/api/analytical/mmn")
+async def calculate_mmn_analytical(config: dict):
+    """Calculate M/M/N metrics analytically using real formulas"""
+    try:
+        from src.analysis.analytical import MMNAnalytical
+
+        arrival_rate = config.get("arrival_rate")
+        num_threads = config.get("num_threads")
+        service_rate = config.get("service_rate")
+
+        if not all([arrival_rate, num_threads, service_rate]):
+            return JSONResponse(
+                status_code=400,
+                content={"error": "Missing required parameters: arrival_rate, num_threads, service_rate"}
+            )
+
+        # Create analytical model
+        analytical = MMNAnalytical(
+            arrival_rate=arrival_rate,
+            num_threads=num_threads,
+            service_rate=service_rate
+        )
+
+        # Calculate all metrics
+        metrics = analytical.all_metrics()
+
+        return JSONResponse(content={
+            "model_type": "M/M/N",
+            "config": {
+                "arrival_rate": arrival_rate,
+                "num_threads": num_threads,
+                "service_rate": service_rate
+            },
+            "metrics": metrics,
+            "formulas_used": [
+                "Eq. 1: Utilization ρ = λ/(N·μ)",
+                "Eq. 2: Erlang-C formula",
+                "Eq. 4: Mean queue length Lq",
+                "Eq. 5: Mean waiting time Wq (Little's Law)"
+            ]
+        })
+
+    except ValueError as e:
+        return JSONResponse(status_code=400, content={"error": str(e)})
+    except Exception as e:
+        return JSONResponse(status_code=500, content={"error": f"Internal server error: {str(e)}"})
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=3100)
