@@ -2,6 +2,7 @@
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 from typing import Literal, Optional, List, Dict
+from dataclasses import dataclass
 
 
 class QueueConfig(BaseModel):
@@ -278,6 +279,190 @@ class MEkNConfig(QueueConfig):
         le=20,
         description="Number of Erlang phases (k)"
     )
+
+
+@dataclass
+class ServerGroup:
+    """
+    Definition of a homogeneous server group
+
+    Used in heterogeneous M/M/N queues where different servers have different speeds.
+
+    Example:
+        # 2 legacy t2.small instances @ 8 msg/sec
+        ServerGroup(count=2, service_rate=8.0, name="t2.small")
+
+        # 3 new t2.large instances @ 15 msg/sec
+        ServerGroup(count=3, service_rate=15.0, name="t2.large")
+    """
+    count: int
+    service_rate: float
+    name: str = ""
+
+    def __post_init__(self):
+        if self.count <= 0:
+            raise ValueError(f"count must be > 0, got {self.count}")
+        if self.service_rate <= 0:
+            raise ValueError(f"service_rate must be > 0, got {self.service_rate}")
+
+
+class HeterogeneousMMNConfig(BaseModel):
+    """
+    Heterogeneous M/M/N Configuration
+
+    Models M/M/N queues with multiple server groups having different service rates.
+    This addresses the "Future Work" from Li et al. (2015) regarding heterogeneous
+    server modeling.
+
+    Example - Cloud Message Broker with Mixed Instance Types:
+        config = HeterogeneousMMNConfig(
+            arrival_rate=100,
+            server_groups=[
+                ServerGroup(count=2, service_rate=8.0, name="t2.small (legacy)"),
+                ServerGroup(count=3, service_rate=15.0, name="t2.large (new)")
+            ],
+            sim_duration=1000,
+            warmup_time=100,
+            random_seed=42
+        )
+
+    Mathematical Properties:
+    - Total servers: N = Σ n_i
+    - Weighted avg service rate: μ_avg = (Σ n_i·μ_i) / N
+    - Heterogeneity increases queueing delay compared to homogeneous system
+      with same total capacity (due to increased service time variance)
+
+    Reference:
+    Whitt, W. (1985). "Deciding which queue to join: Some counterexamples."
+    Operations Research, 34(1), 55-62.
+    """
+    model_type: Literal["HeterogeneousMMN"] = "HeterogeneousMMN"
+
+    # Arrival process
+    arrival_rate: float = Field(
+        gt=0,
+        description="λ (messages/sec)"
+    )
+
+    # Server groups (heterogeneous servers)
+    server_groups: List[ServerGroup] = Field(
+        description="List of server groups with different service rates"
+    )
+
+    # Server selection policy
+    selection_policy: Literal["random", "fastest_first", "round_robin", "shortest_queue"] = Field(
+        default="random",
+        description="Policy for selecting which server group to use"
+    )
+
+    # Simulation parameters
+    sim_duration: float = Field(
+        default=1000.0,
+        gt=0,
+        description="Simulation time (seconds)"
+    )
+    warmup_time: float = Field(
+        default=100.0,
+        ge=0,
+        description="Warmup period to discard"
+    )
+    random_seed: Optional[int] = Field(
+        default=None,
+        description="Random seed for reproducibility"
+    )
+
+    @model_validator(mode='after')
+    def validate_server_groups(self):
+        """Ensure at least one server group exists"""
+        if not self.server_groups:
+            raise ValueError("Must specify at least one server group")
+
+        if len(self.server_groups) == 1:
+            # Only one group - this is effectively homogeneous M/M/N
+            print(
+                "WARNING: Only one server group specified. "
+                "Consider using MMNConfig for homogeneous systems."
+            )
+
+        return self
+
+    @model_validator(mode='after')
+    def check_stability(self):
+        """Ensure system is stable (ρ < 1) using weighted average service rate"""
+        rho = self.utilization
+
+        if rho >= 1.0:
+            raise ValueError(
+                f"System unstable: ρ = {rho:.3f} >= 1. "
+                f"Total capacity: {self.total_capacity:.1f} msg/sec, "
+                f"Arrival rate: {self.arrival_rate:.1f} msg/sec. "
+                f"Reduce arrival_rate or add more servers/increase service rates."
+            )
+
+        return self
+
+    @property
+    def total_servers(self) -> int:
+        """Total number of servers across all groups: N = Σ n_i"""
+        return sum(group.count for group in self.server_groups)
+
+    @property
+    def weighted_service_rate(self) -> float:
+        """
+        Weighted average service rate: μ_avg = (Σ n_i·μ_i) / N
+
+        This is the service rate of an equivalent homogeneous system.
+        """
+        total_capacity = sum(group.count * group.service_rate for group in self.server_groups)
+        return total_capacity / self.total_servers
+
+    @property
+    def total_capacity(self) -> float:
+        """
+        Total system capacity: C = Σ n_i·μ_i (messages/sec)
+
+        This is the maximum throughput if all servers are always busy.
+        """
+        return sum(group.count * group.service_rate for group in self.server_groups)
+
+    @property
+    def utilization(self) -> float:
+        """
+        System utilization: ρ = λ / C = λ / (Σ n_i·μ_i)
+
+        For heterogeneous systems, utilization is calculated using total capacity.
+        """
+        return self.arrival_rate / self.total_capacity
+
+    @property
+    def heterogeneity_coefficient(self) -> float:
+        """
+        Coefficient of variation of service rates across server groups
+
+        CV_μ = σ_μ / μ_avg
+
+        Higher values indicate more heterogeneity (worse performance).
+        CV_μ = 0 means homogeneous (all servers identical).
+        """
+        mu_avg = self.weighted_service_rate
+
+        # Calculate variance of service rates (weighted by server count)
+        variance = sum(
+            group.count * (group.service_rate - mu_avg) ** 2
+            for group in self.server_groups
+        ) / self.total_servers
+
+        std_dev = variance ** 0.5
+        return std_dev / mu_avg if mu_avg > 0 else 0.0
+
+    @property
+    def traffic_intensity(self) -> float:
+        """
+        Traffic intensity using weighted average: a = λ / μ_avg
+
+        Note: For heterogeneous systems, this is an approximation.
+        """
+        return self.arrival_rate / self.weighted_service_rate
 
 
 class TandemQueueConfig(BaseModel):
