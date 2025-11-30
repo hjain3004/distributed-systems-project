@@ -1,9 +1,4 @@
-/**
- * All 15 Equations Page
- * Comprehensive display of all analytical formulas
- */
-
-import { Container, Typography, Paper, Grid, Box, Divider, Chip } from '@mui/material';
+import React from 'react';
 import {
   Equation1,
   Equation2,
@@ -26,243 +21,207 @@ import {
   TandemEquation4,
   TandemEquation5,
 } from '../components/MathEquation';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Separator } from '@/components/ui/separator';
 
 export const AllEquations = () => {
   return (
-    <Container maxWidth="xl" sx={{ py: 4 }}>
-      {/* Header */}
-      <Paper elevation={3} sx={{ p: 4, mb: 4, backgroundColor: 'primary.main', color: 'white' }}>
-        <Typography variant="h3" gutterBottom fontWeight="bold">
-          15 Core Analytical Equations
-        </Typography>
-        <Typography variant="h6" sx={{ opacity: 0.95 }}>
-          Complete Mathematical Framework for Queue Modeling
-        </Typography>
-      </Paper>
+    <div className="space-y-8 pb-10">
+      <div className="space-y-2">
+        <h1 className="text-3xl font-bold tracking-tight">Analytical Framework</h1>
+        <p className="text-muted-foreground">
+          Comprehensive reference of all 15 core queueing theory equations used in the system.
+        </p>
+      </div>
 
-      {/* Section 1: M/M/N Baseline (Equations 1-5) */}
-      <Paper elevation={2} sx={{ p: 4, mb: 4 }}>
-        <Box sx={{ display: 'flex', alignItems: 'center', mb: 3 }}>
-          <Typography variant="h4" color="primary" fontWeight="bold">
-            Section 1: M/M/N Baseline
-          </Typography>
-          <Chip label="Equations 1-5" color="primary" sx={{ ml: 2 }} />
-        </Box>
-        <Typography variant="body1" paragraph color="text.secondary">
-          Exponential service times (C² = 1). Forms the baseline for comparison.
-        </Typography>
-        <Divider sx={{ mb: 3 }} />
-        <Grid container spacing={3}>
-          <Grid item xs={12} md={6}>
-            <Box sx={{ p: 2, backgroundColor: 'background.default', borderRadius: 1 }}>
+      {/* Section 1: M/M/N Baseline */}
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-xl text-primary">Section 1: M/M/N Baseline</CardTitle>
+            <Badge variant="default">Equations 1-5</Badge>
+          </div>
+          <CardDescription>
+            Standard Markovian model with exponential service times (C² = 1).
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          <div className="grid gap-6 md:grid-cols-2">
+            <div className="rounded-lg border bg-card text-card-foreground shadow-sm p-4">
               <Equation1 />
-              <Typography variant="caption" color="text.secondary">
-                System utilization. Must be &lt; 1 for stability.
-              </Typography>
-            </Box>
-          </Grid>
-          <Grid item xs={12} md={6}>
-            <Box sx={{ p: 2, backgroundColor: 'background.default', borderRadius: 1 }}>
+              <p className="mt-2 text-xs text-muted-foreground">
+                System utilization (ρ). Must be &lt; 1 for stability.
+              </p>
+            </div>
+            <div className="rounded-lg border bg-card text-card-foreground shadow-sm p-4">
               <Equation2 />
-              <Typography variant="caption" color="text.secondary">
-                Probability that arriving customer must wait (queue not empty).
-              </Typography>
-            </Box>
-          </Grid>
-          <Grid item xs={12} md={6}>
-            <Box sx={{ p: 2, backgroundColor: 'background.default', borderRadius: 1 }}>
+              <p className="mt-2 text-xs text-muted-foreground">
+                Erlang-C formula: Probability that an arriving customer must wait.
+              </p>
+            </div>
+            <div className="rounded-lg border bg-card text-card-foreground shadow-sm p-4">
               <Equation3 />
-              <Typography variant="caption" color="text.secondary">
-                Probability system is empty (all servers idle).
-              </Typography>
-            </Box>
-          </Grid>
-          <Grid item xs={12} md={6}>
-            <Box sx={{ p: 2, backgroundColor: 'background.default', borderRadius: 1 }}>
+              <p className="mt-2 text-xs text-muted-foreground">
+                Probability system is empty (P₀).
+              </p>
+            </div>
+            <div className="rounded-lg border bg-card text-card-foreground shadow-sm p-4">
               <Equation4 />
-              <Typography variant="caption" color="text.secondary">
-                Average number of customers waiting in queue.
-              </Typography>
-            </Box>
-          </Grid>
-          <Grid item xs={12}>
-            <Box sx={{ p: 2, backgroundColor: 'background.default', borderRadius: 1 }}>
+              <p className="mt-2 text-xs text-muted-foreground">
+                Mean queue length (Lq).
+              </p>
+            </div>
+            <div className="rounded-lg border bg-card text-card-foreground shadow-sm p-4 md:col-span-2">
               <Equation5 />
-              <Typography variant="caption" color="text.secondary">
-                Average time spent waiting in queue (Little's Law).
-              </Typography>
-            </Box>
-          </Grid>
-        </Grid>
-      </Paper>
+              <p className="mt-2 text-xs text-muted-foreground">
+                Mean waiting time (Wq) - Little's Law application.
+              </p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
-      {/* Section 2: M/G/N Heavy-Tailed (Equations 6-10) */}
-      <Paper elevation={2} sx={{ p: 4, mb: 4 }}>
-        <Box sx={{ display: 'flex', alignItems: 'center', mb: 3 }}>
-          <Typography variant="h4" color="secondary" fontWeight="bold">
-            Section 2: M/G/N Heavy-Tailed Extension
-          </Typography>
-          <Chip label="Equations 6-10" color="secondary" sx={{ ml: 2 }} />
-        </Box>
-        <Typography variant="body1" paragraph color="text.secondary">
-          Pareto distribution for heavy-tailed service times (C² &gt; 1). Models real-world workloads.
-        </Typography>
-        <Divider sx={{ mb: 3 }} />
-        <Grid container spacing={3}>
-          <Grid item xs={12}>
-            <Box sx={{ p: 2, backgroundColor: 'background.default', borderRadius: 1 }}>
+      {/* Section 2: M/G/N Heavy-Tailed */}
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-xl text-destructive">Section 2: M/G/N Heavy-Tailed</CardTitle>
+            <Badge variant="destructive">Equations 6-10</Badge>
+          </div>
+          <CardDescription>
+            General service time distribution (Pareto) modeling real-world variance.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+            <div className="rounded-lg border bg-card text-card-foreground shadow-sm p-4 md:col-span-2 lg:col-span-3">
               <Equation6 />
-              <Typography variant="caption" color="text.secondary">
-                Pareto probability density function. α controls tail heaviness (α &lt; 2 = infinite variance!).
-              </Typography>
-            </Box>
-          </Grid>
-          <Grid item xs={12} md={4}>
-            <Box sx={{ p: 2, backgroundColor: 'background.default', borderRadius: 1 }}>
+              <p className="mt-2 text-xs text-muted-foreground">
+                Pareto PDF. Shape parameter α controls tail heaviness.
+              </p>
+            </div>
+            <div className="rounded-lg border bg-card text-card-foreground shadow-sm p-4">
               <Equation7 />
-              <Typography variant="caption" color="text.secondary">
-                Mean service time. Requires α &gt; 1.
-              </Typography>
-            </Box>
-          </Grid>
-          <Grid item xs={12} md={4}>
-            <Box sx={{ p: 2, backgroundColor: 'background.default', borderRadius: 1 }}>
+              <p className="mt-2 text-xs text-muted-foreground">
+                Mean service time (E[S]).
+              </p>
+            </div>
+            <div className="rounded-lg border bg-card text-card-foreground shadow-sm p-4">
               <Equation8 />
-              <Typography variant="caption" color="text.secondary">
-                Second moment. Requires α &gt; 2.
-              </Typography>
-            </Box>
-          </Grid>
-          <Grid item xs={12} md={4}>
-            <Box sx={{ p: 2, backgroundColor: 'background.default', borderRadius: 1 }}>
+              <p className="mt-2 text-xs text-muted-foreground">
+                Second moment (E[S²]).
+              </p>
+            </div>
+            <div className="rounded-lg border bg-card text-card-foreground shadow-sm p-4">
               <Equation9 />
-              <Typography variant="caption" color="text.secondary">
-                Coefficient of variation (CORRECTED). α=2.5 → C²=1.0.
-              </Typography>
-            </Box>
-          </Grid>
-          <Grid item xs={12}>
-            <Box sx={{ p: 2, backgroundColor: 'background.default', borderRadius: 1 }}>
+              <p className="mt-2 text-xs text-muted-foreground">
+                Squared Coefficient of Variation (C²).
+              </p>
+            </div>
+            <div className="rounded-lg border bg-card text-card-foreground shadow-sm p-4 md:col-span-2 lg:col-span-3">
               <Equation10 />
-              <Typography variant="caption" color="text.secondary">
-                Pollaczek-Khinchin approximation for M/G/N waiting time.
-              </Typography>
-            </Box>
-          </Grid>
-        </Grid>
-      </Paper>
+              <p className="mt-2 text-xs text-muted-foreground">
+                Pollaczek-Khinchin approximation for M/G/N mean waiting time.
+              </p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
-      {/* Section 3: Threading Models (Equations 11-15) */}
-      <Paper elevation={2} sx={{ p: 4, mb: 4 }}>
-        <Box sx={{ display: 'flex', alignItems: 'center', mb: 3 }}>
-          <Typography variant="h4" color="success.main" fontWeight="bold">
-            Section 3: Threading Models
-          </Typography>
-          <Chip label="Equations 11-15" color="success" sx={{ ml: 2 }} />
-        </Box>
-        <Typography variant="body1" paragraph color="text.secondary">
-          Dedicated vs shared thread pools. Overhead and saturation effects.
-        </Typography>
-        <Divider sx={{ mb: 3 }} />
-        <Grid container spacing={3}>
-          <Grid item xs={12} md={6}>
-            <Box sx={{ p: 2, backgroundColor: 'background.default', borderRadius: 1 }}>
+      {/* Section 3: Threading Models */}
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-xl text-green-600 dark:text-green-400">Section 3: Threading Models</CardTitle>
+            <Badge className="bg-green-600 hover:bg-green-700">Equations 11-15</Badge>
+          </div>
+          <CardDescription>
+            Concurrency limits and overhead analysis.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          <div className="grid gap-6 md:grid-cols-2">
+            <div className="rounded-lg border bg-card text-card-foreground shadow-sm p-4">
               <Equation11 />
-              <Typography variant="caption" color="text.secondary">
-                Maximum concurrent connections in dedicated threading.
-              </Typography>
-            </Box>
-          </Grid>
-          <Grid item xs={12} md={6}>
-            <Box sx={{ p: 2, backgroundColor: 'background.default', borderRadius: 1 }}>
+              <p className="mt-2 text-xs text-muted-foreground">
+                Max concurrent connections (N_max).
+              </p>
+            </div>
+            <div className="rounded-lg border bg-card text-card-foreground shadow-sm p-4">
               <Equation12 />
-              <Typography variant="caption" color="text.secondary">
-                System throughput (limited by threads or arrivals).
-              </Typography>
-            </Box>
-          </Grid>
-          <Grid item xs={12} md={6}>
-            <Box sx={{ p: 2, backgroundColor: 'background.default', borderRadius: 1 }}>
+              <p className="mt-2 text-xs text-muted-foreground">
+                System throughput (X).
+              </p>
+            </div>
+            <div className="rounded-lg border bg-card text-card-foreground shadow-sm p-4">
               <Equation13 />
-              <Typography variant="caption" color="text.secondary">
-                Effective service rate with thread contention overhead.
-              </Typography>
-            </Box>
-          </Grid>
-          <Grid item xs={12} md={6}>
-            <Box sx={{ p: 2, backgroundColor: 'background.default', borderRadius: 1 }}>
+              <p className="mt-2 text-xs text-muted-foreground">
+                Effective service rate with contention (μ').
+              </p>
+            </div>
+            <div className="rounded-lg border bg-card text-card-foreground shadow-sm p-4">
               <Equation14 />
-              <Typography variant="caption" color="text.secondary">
-                Probability all threads are busy (saturation).
-              </Typography>
-            </Box>
-          </Grid>
-          <Grid item xs={12}>
-            <Box sx={{ p: 2, backgroundColor: 'background.default', borderRadius: 1 }}>
+              <p className="mt-2 text-xs text-muted-foreground">
+                Saturation probability (P_sat).
+              </p>
+            </div>
+            <div className="rounded-lg border bg-card text-card-foreground shadow-sm p-4 md:col-span-2">
               <Equation15 />
-              <Typography variant="caption" color="text.secondary">
-                99th percentile latency (assumes normal distribution - fails for heavy tails!).
-              </Typography>
-            </Box>
-          </Grid>
-        </Grid>
-      </Paper>
+              <p className="mt-2 text-xs text-muted-foreground">
+                99th percentile response time (Normal approx - inaccurate for heavy tails).
+              </p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
-      {/* Bonus: Tandem Queue Equations */}
-      <Paper elevation={2} sx={{ p: 4 }}>
-        <Box sx={{ display: 'flex', alignItems: 'center', mb: 3 }}>
-          <Typography variant="h4" color="info.main" fontWeight="bold">
-            Bonus: Tandem Queue Model
-          </Typography>
-          <Chip label="Li et al. 2015" color="info" sx={{ ml: 2 }} />
-        </Box>
-        <Typography variant="body1" paragraph color="text.secondary">
-          Two-stage broker→receiver architecture. Critical insight: Λ₂ = λ/(1-p).
-        </Typography>
-        <Divider sx={{ mb: 3 }} />
-        <Grid container spacing={3}>
-          <Grid item xs={12} md={6}>
-            <Box sx={{ p: 2, backgroundColor: 'background.default', borderRadius: 1 }}>
+      {/* Bonus: Tandem Queue */}
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-xl text-blue-600 dark:text-blue-400">Bonus: Tandem Queue</CardTitle>
+            <Badge className="bg-blue-600 hover:bg-blue-700">Li et al. 2015</Badge>
+          </div>
+          <CardDescription>
+            Multi-stage architecture with reliability guarantees (retries).
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          <div className="grid gap-6 md:grid-cols-2">
+            <div className="rounded-lg border bg-card text-card-foreground shadow-sm p-4">
               <TandemEquation1 />
-              <Typography variant="caption" color="text.secondary">
-                Stage 1 (broker) utilization.
-              </Typography>
-            </Box>
-          </Grid>
-          <Grid item xs={12} md={6}>
-            <Box sx={{ p: 2, backgroundColor: 'background.default', borderRadius: 1 }}>
+              <p className="mt-2 text-xs text-muted-foreground">
+                Stage 1 utilization (ρ₁).
+              </p>
+            </div>
+            <div className="rounded-lg border bg-card text-card-foreground shadow-sm p-4">
               <TandemEquation2 />
-              <Typography variant="caption" color="text.secondary">
-                Stage 2 sees HIGHER arrival rate due to retransmissions!
-              </Typography>
-            </Box>
-          </Grid>
-          <Grid item xs={12} md={6}>
-            <Box sx={{ p: 2, backgroundColor: 'background.default', borderRadius: 1 }}>
+              <p className="mt-2 text-xs text-muted-foreground">
+                Stage 2 effective arrival rate (Λ₂). Includes retries!
+              </p>
+            </div>
+            <div className="rounded-lg border bg-card text-card-foreground shadow-sm p-4">
               <TandemEquation3 />
-              <Typography variant="caption" color="text.secondary">
-                Stage 2 utilization (must account for retries).
-              </Typography>
-            </Box>
-          </Grid>
-          <Grid item xs={12} md={6}>
-            <Box sx={{ p: 2, backgroundColor: 'background.default', borderRadius: 1 }}>
+              <p className="mt-2 text-xs text-muted-foreground">
+                Stage 2 utilization (ρ₂).
+              </p>
+            </div>
+            <div className="rounded-lg border bg-card text-card-foreground shadow-sm p-4">
               <TandemEquation4 />
-              <Typography variant="caption" color="text.secondary">
-                Expected network time (send + ACK + retries).
-              </Typography>
-            </Box>
-          </Grid>
-          <Grid item xs={12}>
-            <Box sx={{ p: 2, backgroundColor: 'background.default', borderRadius: 1 }}>
+              <p className="mt-2 text-xs text-muted-foreground">
+                Expected network time (E[T_net]).
+              </p>
+            </div>
+            <div className="rounded-lg border bg-card text-card-foreground shadow-sm p-4 md:col-span-2">
               <TandemEquation5 />
-              <Typography variant="caption" color="text.secondary">
-                End-to-end latency through both stages and network.
-              </Typography>
-            </Box>
-          </Grid>
-        </Grid>
-      </Paper>
-    </Container>
+              <p className="mt-2 text-xs text-muted-foreground">
+                Total end-to-end latency (E[T]).
+              </p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
   );
 };

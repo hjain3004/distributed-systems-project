@@ -1,29 +1,38 @@
-/**
- * Tandem Queue - Two-Stage Model
- */
-
-import { Container, Typography, Paper, Box } from '@mui/material';
+import React from 'react';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { TandemEquation1, TandemEquation2, TandemEquation3 } from '../components/MathEquation';
 
 export const TandemQueue = () => {
   return (
-    <Container maxWidth="xl" sx={{ py: 4 }}>
-      <Paper elevation={3} sx={{ p: 4, backgroundColor: 'info.main', color: 'white' }}>
-        <Typography variant="h3" gutterBottom fontWeight="bold">
-          Tandem Queue Model
-        </Typography>
-        <Typography variant="h6">
+    <div className="space-y-8">
+      <div className="space-y-2">
+        <h1 className="text-3xl font-bold tracking-tight">Tandem Queue Model</h1>
+        <p className="text-muted-foreground">
           Two-Stage Broker→Receiver Architecture (Li et al. 2015)
-        </Typography>
-      </Paper>
-      <Paper elevation={2} sx={{ p: 4, mt: 3 }}>
-        <Typography variant="h5" gutterBottom color="primary">
-          Critical Equations
-        </Typography>
-        <TandemEquation1 />
-        <TandemEquation2 />
-        <TandemEquation3 />
-      </Paper>
-    </Container>
+        </p>
+      </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Critical Equations</CardTitle>
+          <CardDescription>
+            Mathematical foundation for the two-stage system with reliability guarantees.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          <div className="grid gap-6">
+            <div className="rounded-lg border bg-card text-card-foreground shadow-sm p-4">
+              <TandemEquation1 />
+            </div>
+            <div className="rounded-lg border bg-card text-card-foreground shadow-sm p-4">
+              <TandemEquation2 />
+            </div>
+            <div className="rounded-lg border bg-card text-card-foreground shadow-sm p-4">
+              <TandemEquation3 />
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
   );
 };

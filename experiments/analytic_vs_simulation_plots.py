@@ -88,8 +88,8 @@ def plot_mmn_validation():
     ax.grid(True, alpha=0.3)
 
     plt.tight_layout()
-    plt.savefig('experiments/plots/mmn_validation.png', dpi=300, bbox_inches='tight')
-    print("\n  ✓ Saved: experiments/plots/mmn_validation.png")
+    plt.savefig('results/plots/mmn_validation.png', dpi=300, bbox_inches='tight')
+    print("\n  ✓ Saved: results/plots/mmn_validation.png")
 
     return fig
 
@@ -185,8 +185,8 @@ def plot_mgn_heavy_tail():
             fontsize=9, color='gray')
 
     plt.tight_layout()
-    plt.savefig('experiments/plots/mgn_heavy_tail.png', dpi=300, bbox_inches='tight')
-    print("\n  ✓ Saved: experiments/plots/mgn_heavy_tail.png")
+    plt.savefig('results/plots/mgn_heavy_tail.png', dpi=300, bbox_inches='tight')
+    print("\n  ✓ Saved: results/plots/mgn_heavy_tail.png")
 
     return fig
 
@@ -266,8 +266,8 @@ def plot_tandem_queue_validation():
     ax.grid(True, alpha=0.3)
 
     plt.tight_layout()
-    plt.savefig('experiments/plots/tandem_validation.png', dpi=300, bbox_inches='tight')
-    print("\n  ✓ Saved: experiments/plots/tandem_validation.png")
+    plt.savefig('results/plots/tandem_validation.png', dpi=300, bbox_inches='tight')
+    print("\n  ✓ Saved: results/plots/tandem_validation.png")
 
     return fig
 
@@ -344,8 +344,8 @@ def plot_stage2_arrival_rate():
     ax.grid(True, alpha=0.3)
 
     plt.tight_layout()
-    plt.savefig('experiments/plots/stage2_arrival_validation.png', dpi=300, bbox_inches='tight')
-    print("\n  ✓ Saved: experiments/plots/stage2_arrival_validation.png")
+    plt.savefig('results/plots/stage2_arrival_validation.png', dpi=300, bbox_inches='tight')
+    print("\n  ✓ Saved: results/plots/stage2_arrival_validation.png")
 
     return fig
 
@@ -358,7 +358,7 @@ def main():
     print("="*70)
 
     # Create output directory
-    os.makedirs('experiments/plots', exist_ok=True)
+    os.makedirs('results/plots', exist_ok=True)
 
     # Generate all plots
     try:
@@ -370,7 +370,7 @@ def main():
         print("\n" + "="*70)
         print("✓ ALL VALIDATION PLOTS CREATED")
         print("="*70)
-        print("\nPlots saved to experiments/plots/:")
+        print("\nPlots saved to results/plots/:")
         print("  1. mmn_validation.png - M/M/N analytical vs simulation")
         print("  2. mgn_heavy_tail.png - Heavy-tail impact on p99")
         print("  3. tandem_validation.png - End-to-end latency validation")

@@ -14,7 +14,7 @@ class RaftRequest(BaseModel):
     simulation_time: float = Field(default=50.0, gt=0, description="Simulation duration (seconds)")
 
     class Config:
-        schema_extra = {
+        json_schema_extra = {
             "example": {
                 "num_nodes": 5,
                 "simulation_time": 50.0
@@ -27,7 +27,7 @@ class VectorClockRequest(BaseModel):
     num_processes: int = Field(default=3, ge=2, description="Number of processes")
 
     class Config:
-        schema_extra = {
+        json_schema_extra = {
             "example": {
                 "num_processes": 3
             }
@@ -41,7 +41,7 @@ class TwoPhaseCommitRequest(BaseModel):
     simulation_time: float = Field(default=100.0, gt=0, description="Simulation duration (seconds)")
 
     class Config:
-        schema_extra = {
+        json_schema_extra = {
             "example": {
                 "num_participants": 5,
                 "vote_yes_probability": 1.0,
@@ -59,7 +59,7 @@ class DistributedSimulationResponse(BaseModel):
     created_at: datetime
 
     class Config:
-        schema_extra = {
+        json_schema_extra = {
             "example": {
                 "simulation_id": "123e4567-e89b-12d3-a456-426614174000",
                 "protocol": "Raft",

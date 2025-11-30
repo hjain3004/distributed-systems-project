@@ -144,14 +144,23 @@ def reproduce_figure_11():
                 mu2=PaperExperimentConfig.BASELINE['mu2'],
                 network_delay=PaperExperimentConfig.BASELINE['network_delay'],
                 failure_prob=failure_prob,
-                sim_duration=PaperExperimentConfig.BASELINE['sim_duration'],
-                warmup_time=PaperExperimentConfig.BASELINE['warmup_time'],
+                sim_duration=WARMUP_TIME + 1000,
+                warmup_time=WARMUP_TIME,
                 random_seed=42
             )
 
-            # Run simulation
-            stats = run_tandem_simulation(config)
-
+            # Run simulation (with replications)
+            sim_values = []
+            for _ in range(REPLICATIONS):
+                stats = run_tandem_simulation(config)
+                sim_values.append(stats['mean_end_to_end'])
+            
+            # Calculate statistics
+            our_value = np.mean(sim_values)
+            std_dev = np.std(sim_values, ddof=1) if len(sim_values) > 1 else 0.0
+            std_error = std_dev / np.sqrt(len(sim_values))
+            ci_95 = 1.96 * std_error
+            
             # Get analytical result
             analytical = TandemQueueAnalytical(
                 lambda_arrival=config.arrival_rate,
@@ -170,7 +179,6 @@ def reproduce_figure_11():
             paper_value = paper_data['q_99_percent' if q_label == 'q_99%' else 'q_88_percent'][n]
 
             # Calculate error
-            our_value = stats['mean_end_to_end']  # Total delivery time
             error_pct = abs(our_value - paper_value) / paper_value * 100
 
             results.append({
@@ -178,12 +186,13 @@ def reproduce_figure_11():
                 'n_threads': n,
                 'paper_mean_delivery': paper_value,
                 'our_simulated': our_value,
+                'ci_95': ci_95,
                 'our_analytical': analytical_metrics['total_delivery_time'],
                 'error_vs_paper_pct': error_pct
             })
 
             print(f"  n={n:2d}: Paper={paper_value:.3f}s, "
-                  f"Our={our_value:.3f}s, "
+                  f"Our={our_value:.3f}s ± {ci_95:.3f}s, "
                   f"Error={error_pct:.1f}%")
 
     df = pd.DataFrame(results)
@@ -310,8 +319,8 @@ def reproduce_figure_13():
                 mu2=PaperExperimentConfig.BASELINE['mu2'],
                 network_delay=PaperExperimentConfig.BASELINE['network_delay'],
                 failure_prob=failure_prob,
-                sim_duration=PaperExperimentConfig.BASELINE['sim_duration'],
-                warmup_time=PaperExperimentConfig.BASELINE['warmup_time'],
+                sim_duration=WARMUP_TIME + 1000,
+                warmup_time=WARMUP_TIME,
                 random_seed=42
             )
 
@@ -322,11 +331,18 @@ def reproduce_figure_13():
             paper_sender_util = PaperExperimentConfig.FIGURE_13_DATA[q_key]['sender'][n]
             paper_broker_util = PaperExperimentConfig.FIGURE_13_DATA[q_key]['broker'][n]
 
-            # Calculate utilization from simulation data
-            # Utilization ρ = λ / (n * μ)
-            # For stage 2, account for retransmissions: λ_eff = λ / (1 - p)
-            our_sender_util = config.arrival_rate / (n * config.mu1)
-            our_broker_util = (config.arrival_rate / (1 - config.failure_prob)) / (n * config.mu2)
+            # Simulation (run replications)
+            sim_results = []
+            for rep in range(REPLICATIONS):
+                stats = run_tandem_simulation(config)
+                sim_results.append({
+                    'sender_util': stats['mean_stage1_utilization'],
+                    'broker_util': stats['mean_stage2_utilization']
+                })
+
+            # Average over replications
+            our_sender_util = sum(r['sender_util'] for r in sim_results) / REPLICATIONS
+            our_broker_util = sum(r['broker_util'] for r in sim_results) / REPLICATIONS
 
             # Calculate errors
             sender_error = abs(our_sender_util - paper_sender_util) / paper_sender_util * 100
@@ -414,8 +430,8 @@ def reproduce_figure_14():
                 mu2=service_rate,
                 network_delay=PaperExperimentConfig.BASELINE['network_delay'],
                 failure_prob=failure_prob,
-                sim_duration=PaperExperimentConfig.BASELINE['sim_duration'],
-                warmup_time=PaperExperimentConfig.BASELINE['warmup_time'],
+                sim_duration=WARMUP_TIME + 1000,
+                warmup_time=WARMUP_TIME,
                 random_seed=42
             )
 
@@ -496,8 +512,8 @@ def reproduce_figure_15():
                 mu2=service_rate,
                 network_delay=PaperExperimentConfig.BASELINE['network_delay'],
                 failure_prob=failure_prob,
-                sim_duration=PaperExperimentConfig.BASELINE['sim_duration'],
-                warmup_time=PaperExperimentConfig.BASELINE['warmup_time'],
+                sim_duration=WARMUP_TIME + 1000,
+                warmup_time=WARMUP_TIME,
                 random_seed=42
             )
 
@@ -702,10 +718,19 @@ def demonstrate_erlang_improvement():
 
 def main():
     """Run complete paper validation suite"""
+    import argparse
+    parser = argparse.ArgumentParser(description='Run paper validation experiments')
+    parser.add_argument('--rigorous', action='store_true', help='Run with high replication count (20) for statistical rigor')
+    args = parser.parse_args()
 
+    replications = 100 if args.rigorous else 5
+    # Warmup validation showed 200s is insufficient for heavy tails. Use 3000s for rigorous mode.
+    warmup_time = 3000 if args.rigorous else 200
+    
     print("\n" + "="*70)
     print(" PAPER VALIDATION: Li et al. (2015)")
     print(" 'Modeling Message Queueing Services with Reliability Guarantee'")
+    print(f" Mode: {'RIGOROUS (100 replications, 3000s warmup)' if args.rigorous else 'FAST (5 replications, 200s warmup)'}")
     print("="*70)
 
     print("\nObjectives:")
@@ -717,6 +742,11 @@ def main():
     print("\n" + "="*70)
     print(" PART 1: REPRODUCING PAPER'S EXPERIMENTS")
     print("="*70)
+
+    # Global settings for experiment functions
+    global REPLICATIONS, WARMUP_TIME
+    REPLICATIONS = replications
+    WARMUP_TIME = warmup_time
 
     fig11_results = reproduce_figure_11()
     fig12_results = reproduce_figure_12()
@@ -731,6 +761,20 @@ def main():
 
     evt_results = demonstrate_evt_improvement()
     erlang_results = demonstrate_erlang_improvement()
+
+    # Save results to CSV
+    os.makedirs('results/data', exist_ok=True)
+    fig11_results.to_csv('results/data/figure11_delivery_time.csv', index=False)
+    fig12_results.to_csv('results/data/figure12_queue_length.csv', index=False)
+    fig13_results.to_csv('results/data/figure13_utilization.csv', index=False)
+    fig14_results.to_csv('results/data/figure14_service_time.csv', index=False)
+    fig15_results.to_csv('results/data/figure15_arrival_rate.csv', index=False)
+    erlang_results.to_csv('results/data/erlang_improvement.csv', index=False)
+    
+    print("\n" + "="*70)
+    print(" DATA SAVED")
+    print("="*70)
+    print("✓ Validation data saved to results/data/*.csv")
 
     # Final summary
     print("\n" + "="*70)
@@ -764,4 +808,6 @@ def main():
 
 
 if __name__ == "__main__":
+    # Default replications
+    REPLICATIONS = 5
     main()

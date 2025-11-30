@@ -1,358 +1,325 @@
-/**
- * M/M/N Calculator - Interactive analytical calculator
- * Real-time parameter adjustment with instant results
- */
-
-import { useState, useEffect } from 'react';
-import {
-  Box,
-  Container,
-  Typography,
-  Paper,
-  Grid,
-  Slider,
-  Card,
-  CardContent,
-  Alert,
-  Chip,
-  Divider,
-} from '@mui/material';
-import Plot from 'react-plotly.js';
-import { MathEquation, Equation1, Equation2, Equation4, Equation5 } from '../components/MathEquation';
+import React, { useState, useEffect } from 'react';
 import axios from 'axios';
+import { motion } from 'framer-motion';
+import {
+  PieChart,
+  Pie,
+  Cell,
+  ResponsiveContainer,
+  Tooltip as RechartsTooltip,
+  Legend
+} from 'recharts';
+import {
+  AlertCircle,
+  Users,
+  Clock,
+  Activity,
+  Server,
+  ArrowRight
+} from 'lucide-react';
 
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Slider } from '@/components/ui/slider';
+import { Label } from '@/components/ui/label';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { Button } from '@/components/ui/button';
+import { cn } from '@/lib/utils';
+
+// Types
 interface MMNMetrics {
   utilization: number;
   erlang_c: number;
-  mean_wait: number;
-  mean_response: number;
+  mean_waiting_time: number;
+  mean_response_time: number;
   mean_queue_length: number;
   mean_system_size: number;
 }
 
+const COLORS = ['#3b82f6', '#ef4444']; // Blue (Service), Red (Wait)
+
 export const MMNCalculator = () => {
-  // Parameters
+  // State
   const [lambda, setLambda] = useState(100);
   const [mu, setMu] = useState(12);
   const [N, setN] = useState(10);
-
-  // Results
   const [metrics, setMetrics] = useState<MMNMetrics | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Auto-calculate on parameter change
+  // Derived
+  const rho = lambda / (N * mu);
+  const isUnstable = rho >= 1;
+
+  // Calculation Effect
   useEffect(() => {
-    calculate();
+    const calculate = async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        const response = await axios.post('/api/analytical/mmn', {
+          arrival_rate: lambda,
+          num_threads: N,
+          service_rate: mu,
+        });
+        setMetrics(response.data.metrics);
+      } catch (err: any) {
+        setError(err.response?.data?.detail || err.message || 'Calculation failed');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    // Debounce slightly to avoid rapid API calls on slider drag
+    const timer = setTimeout(calculate, 100);
+    return () => clearTimeout(timer);
   }, [lambda, mu, N]);
 
-  const calculate = async () => {
-    setLoading(true);
-    setError(null);
-
-    try {
-      const response = await axios.post('/api/analytical/mmn', {
-        arrival_rate: lambda,
-        num_threads: N,
-        service_rate: mu,
-      });
-
-      setMetrics(response.data.metrics);
-    } catch (err: any) {
-      setError(err.response?.data?.detail || err.message || 'Calculation failed');
-    } finally {
-      setLoading(false);
-    }
+  // Animation variants
+  const container = {
+    hidden: { opacity: 0 },
+    show: { opacity: 1, transition: { staggerChildren: 0.1 } }
   };
 
-  const rho = lambda / (N * mu);
-  const a = lambda / mu;
+  const item = {
+    hidden: { opacity: 0, y: 20 },
+    show: { opacity: 1, y: 0 }
+  };
 
   return (
-    <Container maxWidth="xl" sx={{ py: 4 }}>
+    <div className="space-y-8 pb-10">
       {/* Header */}
-      <Paper elevation={3} sx={{ p: 4, mb: 4, backgroundColor: 'primary.main', color: 'white' }}>
-        <Typography variant="h3" gutterBottom fontWeight="bold">
-          M/M/N Queue Calculator
-        </Typography>
-        <Typography variant="h6" sx={{ opacity: 0.95 }}>
-          Instant Analytical Results - No Simulation Required
-        </Typography>
-        <Box sx={{ mt: 2, display: 'flex', gap: 2, flexWrap: 'wrap' }}>
-          <Chip label={`λ = ${lambda} msg/sec`} sx={{ bgcolor: 'white', fontWeight: 'bold' }} />
-          <Chip label={`μ = ${mu} msg/sec/thread`} sx={{ bgcolor: 'white', fontWeight: 'bold' }} />
-          <Chip label={`N = ${N} threads`} sx={{ bgcolor: 'white', fontWeight: 'bold' }} />
-          <Chip label={`ρ = ${rho.toFixed(3)}`} color={rho < 1 ? 'success' : 'error'} sx={{ fontWeight: 'bold' }} />
-        </Box>
-      </Paper>
+      <div className="space-y-2">
+        <h1 className="text-3xl font-bold tracking-tight">M/M/N Calculator</h1>
+        <p className="text-muted-foreground">
+          Analyze multi-server queues with exponential inter-arrival and service times.
+        </p>
+      </div>
 
-      {/* Parameters */}
-      <Paper elevation={2} sx={{ p: 4, mb: 4 }}>
-        <Typography variant="h5" gutterBottom color="primary">
-          Parameters
-        </Typography>
-        <Grid container spacing={4}>
-          <Grid item xs={12} md={4}>
-            <Typography gutterBottom fontWeight="bold">
-              Arrival Rate (λ): {lambda} msg/sec
-            </Typography>
-            <Slider
-              value={lambda}
-              onChange={(_, v) => setLambda(v as number)}
-              min={10}
-              max={200}
-              step={5}
-              marks={[
-                { value: 10, label: '10' },
-                { value: 100, label: '100' },
-                { value: 200, label: '200' },
-              ]}
-              valueLabelDisplay="auto"
-            />
-            <Typography variant="caption" color="text.secondary">
-              Rate of incoming requests
-            </Typography>
-          </Grid>
-          <Grid item xs={12} md={4}>
-            <Typography gutterBottom fontWeight="bold">
-              Service Rate (μ): {mu} msg/sec/thread
-            </Typography>
-            <Slider
-              value={mu}
-              onChange={(_, v) => setMu(v as number)}
-              min={5}
-              max={25}
-              step={1}
-              marks={[
-                { value: 5, label: '5' },
-                { value: 15, label: '15' },
-                { value: 25, label: '25' },
-              ]}
-              valueLabelDisplay="auto"
-            />
-            <Typography variant="caption" color="text.secondary">
-              Processing rate per thread
-            </Typography>
-          </Grid>
-          <Grid item xs={12} md={4}>
-            <Typography gutterBottom fontWeight="bold">
-              Number of Threads (N): {N}
-            </Typography>
-            <Slider
-              value={N}
-              onChange={(_, v) => setN(v as number)}
-              min={1}
-              max={30}
-              step={1}
-              marks={[
-                { value: 1, label: '1' },
-                { value: 15, label: '15' },
-                { value: 30, label: '30' },
-              ]}
-              valueLabelDisplay="auto"
-            />
-            <Typography variant="caption" color="text.secondary">
-              Server capacity
-            </Typography>
-          </Grid>
-        </Grid>
+      <div className="grid gap-6 lg:grid-cols-12">
+        {/* Controls Panel */}
+        <Card className="lg:col-span-4 h-fit">
+          <CardHeader>
+            <CardTitle>Parameters</CardTitle>
+            <CardDescription>Adjust system configuration</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-8">
+            {/* Lambda Slider */}
+            <div className="space-y-4">
+              <div className="flex justify-between items-center">
+                <Label className="text-base font-medium">Arrival Rate (λ)</Label>
+                <span className="text-sm font-mono bg-muted px-2 py-1 rounded">
+                  {lambda} msg/s
+                </span>
+              </div>
+              <Slider
+                value={[lambda]}
+                onValueChange={(v: number[]) => setLambda(v[0])}
+                min={10}
+                max={200}
+                step={5}
+                className="py-2"
+              />
+              <p className="text-xs text-muted-foreground">
+                Rate of incoming requests per second
+              </p>
+            </div>
 
-        {rho >= 1 && (
-          <Alert severity="error" sx={{ mt: 2 }}>
-            System is UNSTABLE! ρ = {rho.toFixed(3)} ≥ 1. Queue will grow without bound.
-            Increase N or μ, or decrease λ.
-          </Alert>
-        )}
-      </Paper>
+            {/* Mu Slider */}
+            <div className="space-y-4">
+              <div className="flex justify-between items-center">
+                <Label className="text-base font-medium">Service Rate (μ)</Label>
+                <span className="text-sm font-mono bg-muted px-2 py-1 rounded">
+                  {mu} msg/s
+                </span>
+              </div>
+              <Slider
+                value={[mu]}
+                onValueChange={(v: number[]) => setMu(v[0])}
+                min={5}
+                max={50}
+                step={1}
+                className="py-2"
+              />
+              <p className="text-xs text-muted-foreground">
+                Processing capacity per single thread
+              </p>
+            </div>
 
-      {/* Formulas */}
-      <Paper elevation={2} sx={{ p: 4, mb: 4 }}>
-        <Typography variant="h5" gutterBottom color="primary">
-          M/M/N Formulas
-        </Typography>
-        <Grid container spacing={2}>
-          <Grid item xs={12} md={6}>
-            <Equation1 />
-          </Grid>
-          <Grid item xs={12} md={6}>
-            <Equation2 />
-          </Grid>
-          <Grid item xs={12} md={6}>
-            <Equation4 />
-          </Grid>
-          <Grid item xs={12} md={6}>
-            <Equation5 />
-          </Grid>
-        </Grid>
-      </Paper>
+            {/* N Slider */}
+            <div className="space-y-4">
+              <div className="flex justify-between items-center">
+                <Label className="text-base font-medium">Threads (N)</Label>
+                <span className="text-sm font-mono bg-muted px-2 py-1 rounded">
+                  {N} threads
+                </span>
+              </div>
+              <Slider
+                value={[N]}
+                onValueChange={(v: number[]) => setN(v[0])}
+                min={1}
+                max={30}
+                step={1}
+                className="py-2"
+              />
+              <p className="text-xs text-muted-foreground">
+                Number of concurrent processing threads
+              </p>
+            </div>
 
-      {/* Results */}
-      {metrics && (
-        <>
-          <Paper elevation={2} sx={{ p: 4, mb: 4 }}>
-            <Typography variant="h5" gutterBottom color="primary">
-              Results
-            </Typography>
-            <Grid container spacing={3}>
-              <Grid item xs={12} sm={6} md={4}>
-                <Card sx={{ height: '100%', bgcolor: 'primary.light' }}>
-                  <CardContent>
-                    <Typography color="primary.dark" gutterBottom>
-                      Utilization (ρ)
-                    </Typography>
-                    <Typography variant="h4" fontWeight="bold">
-                      {(metrics.utilization * 100).toFixed(1)}%
-                    </Typography>
-                    <Typography variant="caption" color="text.secondary">
-                      {metrics.utilization < 0.7 ? 'Low load' : metrics.utilization < 0.9 ? 'Moderate load' : 'High load'}
-                    </Typography>
-                  </CardContent>
-                </Card>
-              </Grid>
-              <Grid item xs={12} sm={6} md={4}>
-                <Card sx={{ height: '100%', bgcolor: 'secondary.light' }}>
-                  <CardContent>
-                    <Typography color="secondary.dark" gutterBottom>
-                      Erlang-C (C)
-                    </Typography>
-                    <Typography variant="h4" fontWeight="bold">
-                      {(metrics.erlang_c * 100).toFixed(1)}%
-                    </Typography>
-                    <Typography variant="caption" color="text.secondary">
-                      Probability of queueing
-                    </Typography>
-                  </CardContent>
-                </Card>
-              </Grid>
-              <Grid item xs={12} sm={6} md={4}>
-                <Card sx={{ height: '100%', bgcolor: 'success.light' }}>
-                  <CardContent>
-                    <Typography color="success.dark" gutterBottom>
-                      Mean Wait (Wq)
-                    </Typography>
-                    <Typography variant="h4" fontWeight="bold">
-                      {(metrics.mean_wait * 1000).toFixed(2)}ms
-                    </Typography>
-                    <Typography variant="caption" color="text.secondary">
-                      Time in queue
-                    </Typography>
-                  </CardContent>
-                </Card>
-              </Grid>
-              <Grid item xs={12} sm={6} md={4}>
-                <Card sx={{ height: '100%', bgcolor: 'warning.light' }}>
-                  <CardContent>
-                    <Typography color="warning.dark" gutterBottom>
-                      Mean Response (R)
-                    </Typography>
-                    <Typography variant="h4" fontWeight="bold">
-                      {(metrics.mean_response * 1000).toFixed(2)}ms
-                    </Typography>
-                    <Typography variant="caption" color="text.secondary">
-                      Total time (wait + service)
-                    </Typography>
-                  </CardContent>
-                </Card>
-              </Grid>
-              <Grid item xs={12} sm={6} md={4}>
-                <Card sx={{ height: '100%', bgcolor: 'error.light' }}>
-                  <CardContent>
-                    <Typography color="error.dark" gutterBottom>
-                      Queue Length (Lq)
-                    </Typography>
-                    <Typography variant="h4" fontWeight="bold">
-                      {metrics.mean_queue_length.toFixed(2)}
-                    </Typography>
-                    <Typography variant="caption" color="text.secondary">
-                      Avg customers waiting
-                    </Typography>
-                  </CardContent>
-                </Card>
-              </Grid>
-              <Grid item xs={12} sm={6} md={4}>
-                <Card sx={{ height: '100%', bgcolor: 'info.light' }}>
-                  <CardContent>
-                    <Typography color="info.dark" gutterBottom>
-                      System Size (L)
-                    </Typography>
-                    <Typography variant="h4" fontWeight="bold">
-                      {metrics.mean_system_size.toFixed(2)}
-                    </Typography>
-                    <Typography variant="caption" color="text.secondary">
-                      Avg customers in system
-                    </Typography>
-                  </CardContent>
-                </Card>
-              </Grid>
-            </Grid>
-          </Paper>
+            {/* Stability Alert */}
+            {isUnstable && (
+              <div className="rounded-lg border border-destructive/50 bg-destructive/10 p-4 text-destructive">
+                <div className="flex items-center gap-2 font-semibold">
+                  <AlertCircle className="h-4 w-4" />
+                  System Unstable
+                </div>
+                <p className="mt-1 text-sm">
+                  Utilization (ρ = {rho.toFixed(2)}) ≥ 1. Queue will grow infinitely.
+                </p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
 
-          {/* Visualization */}
-          <Paper elevation={2} sx={{ p: 4 }}>
-            <Typography variant="h5" gutterBottom color="primary">
-              Performance Visualization
-            </Typography>
-            <Grid container spacing={3}>
-              <Grid item xs={12} md={6}>
-                <Plot
-                  data={[
-                    {
-                      type: 'indicator',
-                      mode: 'gauge+number+delta',
-                      value: metrics.utilization * 100,
-                      title: { text: 'Utilization (%)' },
-                      delta: { reference: 80 },
-                      gauge: {
-                        axis: { range: [0, 100] },
-                        bar: { color: metrics.utilization < 0.7 ? 'green' : metrics.utilization < 0.9 ? 'orange' : 'red' },
-                        steps: [
-                          { range: [0, 70], color: 'lightgreen' },
-                          { range: [70, 90], color: 'lightyellow' },
-                          { range: [90, 100], color: 'lightcoral' },
-                        ],
-                        threshold: {
-                          line: { color: 'red', width: 4 },
-                          thickness: 0.75,
-                          value: 95,
-                        },
-                      },
-                    },
-                  ]}
-                  layout={{
-                    width: 400,
-                    height: 300,
-                  }}
-                />
-              </Grid>
-              <Grid item xs={12} md={6}>
-                <Plot
-                  data={[
-                    {
-                      labels: ['Service Time', 'Queue Wait'],
-                      values: [1 / mu, metrics.mean_wait],
-                      type: 'pie',
-                      marker: {
-                        colors: ['#2196f3', '#f44336'],
-                      },
-                    },
-                  ]}
-                  layout={{
-                    title: { text: 'Response Time Breakdown' },
-                    width: 400,
-                    height: 300,
-                  }}
-                />
-              </Grid>
-            </Grid>
-          </Paper>
-        </>
-      )}
+        {/* Results Panel */}
+        <div className="lg:col-span-8 space-y-6">
+          {metrics && !isUnstable ? (
+            <motion.div
+              variants={container}
+              initial="hidden"
+              animate="show"
+              className="space-y-6"
+            >
+              {/* Key Metrics Grid */}
+              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                <motion.div variants={item}>
+                  <Card>
+                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                      <CardTitle className="text-sm font-medium">Utilization</CardTitle>
+                      <Activity className="h-4 w-4 text-muted-foreground" />
+                    </CardHeader>
+                    <CardContent>
+                      <div className={cn(
+                        "text-2xl font-bold",
+                        metrics.utilization > 0.8 ? "text-orange-500" : "text-green-500"
+                      )}>
+                        {(metrics.utilization * 100).toFixed(1)}%
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        System load factor (ρ)
+                      </p>
+                    </CardContent>
+                  </Card>
+                </motion.div>
 
-      {error && (
-        <Alert severity="error" sx={{ mt: 2 }}>
-          {error}
-        </Alert>
-      )}
-    </Container>
+                <motion.div variants={item}>
+                  <Card>
+                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                      <CardTitle className="text-sm font-medium">Mean Wait</CardTitle>
+                      <Clock className="h-4 w-4 text-muted-foreground" />
+                    </CardHeader>
+                    <CardContent>
+                      <div className="text-2xl font-bold">
+                        {(metrics.mean_waiting_time * 1000).toFixed(1)} ms
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        Avg time in queue (Wq)
+                      </p>
+                    </CardContent>
+                  </Card>
+                </motion.div>
+
+                <motion.div variants={item}>
+                  <Card>
+                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                      <CardTitle className="text-sm font-medium">Queue Length</CardTitle>
+                      <Users className="h-4 w-4 text-muted-foreground" />
+                    </CardHeader>
+                    <CardContent>
+                      <div className="text-2xl font-bold">
+                        {metrics.mean_queue_length.toFixed(2)}
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        Avg items waiting (Lq)
+                      </p>
+                    </CardContent>
+                  </Card>
+                </motion.div>
+              </div>
+
+              {/* Charts Section */}
+              <div className="grid gap-6 md:grid-cols-2">
+                {/* Response Time Breakdown */}
+                <motion.div variants={item}>
+                  <Card className="h-full">
+                    <CardHeader>
+                      <CardTitle>Response Time Breakdown</CardTitle>
+                      <CardDescription>Service vs. Wait Time</CardDescription>
+                    </CardHeader>
+                    <CardContent className="h-[300px]">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <PieChart>
+                          <Pie
+                            data={[
+                              { name: 'Service Time', value: 1 / mu },
+                              { name: 'Wait Time', value: metrics.mean_waiting_time }
+                            ]}
+                            cx="50%"
+                            cy="50%"
+                            innerRadius={60}
+                            outerRadius={80}
+                            paddingAngle={5}
+                            dataKey="value"
+                          >
+                            <Cell fill={COLORS[0]} />
+                            <Cell fill={COLORS[1]} />
+                          </Pie>
+                          <RechartsTooltip
+                            formatter={(value: number) => `${(value * 1000).toFixed(1)} ms`}
+                          />
+                          <Legend />
+                        </PieChart>
+                      </ResponsiveContainer>
+                    </CardContent>
+                  </Card>
+                </motion.div>
+
+                {/* Detailed Stats */}
+                <motion.div variants={item}>
+                  <Card className="h-full">
+                    <CardHeader>
+                      <CardTitle>Detailed Statistics</CardTitle>
+                      <CardDescription>Advanced metrics</CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      <div className="flex justify-between items-center border-b pb-2">
+                        <span className="text-sm font-medium">Erlang-C Probability</span>
+                        <span className="font-mono">{(metrics.erlang_c * 100).toFixed(1)}%</span>
+                      </div>
+                      <div className="flex justify-between items-center border-b pb-2">
+                        <span className="text-sm font-medium">Mean Response Time</span>
+                        <span className="font-mono">{(metrics.mean_response_time * 1000).toFixed(1)} ms</span>
+                      </div>
+                      <div className="flex justify-between items-center border-b pb-2">
+                        <span className="text-sm font-medium">Total System Size</span>
+                        <span className="font-mono">{metrics.mean_system_size.toFixed(2)}</span>
+                      </div>
+                      <div className="flex justify-between items-center pt-2">
+                        <span className="text-sm font-medium">Traffic Intensity (a)</span>
+                        <span className="font-mono">{(lambda / mu).toFixed(2)} Erlangs</span>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </motion.div>
+              </div>
+            </motion.div>
+          ) : (
+            <div className="flex h-full items-center justify-center p-8 text-muted-foreground">
+              {isUnstable ? "Adjust parameters to stabilize system" : "Loading..."}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
   );
 };

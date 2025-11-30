@@ -524,6 +524,24 @@ class TandemQueueConfig(BaseModel):
         description="Transmission failure probability p (0 ≤ p < 1)"
     )
 
+    # Service Distribution Parameters
+    distribution: Literal["exponential", "pareto", "erlang"] = Field(
+        default="exponential",
+        description="Service time distribution type"
+    )
+    
+    alpha: float = Field(
+        default=2.5,
+        gt=1.0,
+        description="Pareto shape parameter (if distribution='pareto')"
+    )
+    
+    erlang_k: int = Field(
+        default=2,
+        gt=0,
+        description="Erlang shape parameter (if distribution='erlang')"
+    )
+
     @model_validator(mode='after')
     def check_stage2_stability(self):
         """

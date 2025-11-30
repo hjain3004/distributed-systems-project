@@ -23,7 +23,7 @@ class MMNAnalyticalRequest(BaseModel):
         return v
 
     class Config:
-        schema_extra = {
+        json_schema_extra = {
             "example": {
                 "arrival_rate": 100.0,
                 "num_threads": 10,
@@ -40,7 +40,7 @@ class MGNAnalyticalRequest(BaseModel):
     variance_service: float = Field(..., ge=0, description="Service time variance Var(S)")
 
     class Config:
-        schema_extra = {
+        json_schema_extra = {
             "example": {
                 "arrival_rate": 80.0,
                 "num_threads": 10,
@@ -61,7 +61,7 @@ class TandemAnalyticalRequest(BaseModel):
     failure_prob: float = Field(default=0.0, ge=0.0, lt=1.0, description="Failure probability")
 
     class Config:
-        schema_extra = {
+        json_schema_extra = {
             "example": {
                 "arrival_rate": 100.0,
                 "n1": 10,
@@ -82,7 +82,8 @@ class AnalyticalResponse(BaseModel):
     formulas_used: List[str]
 
     class Config:
-        schema_extra = {
+        protected_namespaces = ()
+        json_schema_extra = {
             "example": {
                 "model_type": "M/M/N",
                 "config": {

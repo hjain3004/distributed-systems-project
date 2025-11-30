@@ -27,7 +27,7 @@ class MMNSimulationRequest(BaseModel):
         return v
 
     class Config:
-        schema_extra = {
+        json_schema_extra = {
             "example": {
                 "arrival_rate": 100.0,
                 "num_threads": 10,
@@ -66,7 +66,7 @@ class MGNSimulationRequest(BaseModel):
         return v
 
     class Config:
-        schema_extra = {
+        json_schema_extra = {
             "example": {
                 "arrival_rate": 80.0,
                 "num_threads": 10,
@@ -112,7 +112,7 @@ class TandemSimulationRequest(BaseModel):
         return v
 
     class Config:
-        schema_extra = {
+        json_schema_extra = {
             "example": {
                 "arrival_rate": 100.0,
                 "n1": 10,
@@ -137,7 +137,8 @@ class SimulationResponse(BaseModel):
     created_at: datetime
 
     class Config:
-        schema_extra = {
+        protected_namespaces = ()
+        json_schema_extra = {
             "example": {
                 "simulation_id": "123e4567-e89b-12d3-a456-426614174000",
                 "status": "running",
@@ -158,7 +159,7 @@ class SimulationStatus(BaseModel):
     completed_at: Optional[datetime] = None
 
     class Config:
-        schema_extra = {
+        json_schema_extra = {
             "example": {
                 "simulation_id": "123e4567-e89b-12d3-a456-426614174000",
                 "status": "running",

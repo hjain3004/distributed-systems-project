@@ -1,20 +1,29 @@
-/**
- * Results Viewer - View simulation results
- */
-
-import { Container, Typography, Paper } from '@mui/material';
+import React from 'react';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 
 export const ResultsViewer = () => {
   return (
-    <Container maxWidth="xl" sx={{ py: 4 }}>
-      <Paper elevation={3} sx={{ p: 4, backgroundColor: 'success.main', color: 'white' }}>
-        <Typography variant="h3" gutterBottom fontWeight="bold">
-          Results Viewer
-        </Typography>
-        <Typography variant="h6">
-          Browse and analyze simulation results
-        </Typography>
-      </Paper>
-    </Container>
+    <div className="space-y-8">
+      <div className="space-y-2">
+        <h1 className="text-3xl font-bold tracking-tight">Results Viewer</h1>
+        <p className="text-muted-foreground">
+          Browse and analyze simulation results.
+        </p>
+      </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Simulation History</CardTitle>
+          <CardDescription>
+            View past simulation runs and their outcomes.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="flex items-center justify-center h-48 text-muted-foreground border-2 border-dashed rounded-lg">
+            No results available yet. Run a simulation to see data here.
+          </div>
+        </CardContent>
+      </Card>
+    </div>
   );
 };

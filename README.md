@@ -116,6 +116,19 @@ EXPERIMENT 2: Heavy-Tailed Service Times (M/G/N)
 ...
 ```
 
+## Methodology Note: Modern Simulation Approach
+
+**Why SimPy instead of Colored Petri Nets (CPN)?**
+While Li et al. (2015) used CPN Tools, this project implements the model using **Discrete-Event Simulation (DES)** with SimPy. This choice was made to:
+1.  Align with modern industry standards for distributed systems modeling (Python/SimPy).
+2.  Enable easier extension to complex protocols (Raft, Vector Clocks) which are difficult to model in CPN.
+3.  Allow for direct integration with data analysis libraries (Pandas/NumPy).
+
+**Validation:** We successfully reproduced the paper's CPN results (Figures 11-15) using our DES implementation, validating the approach.
+
+**Limitation: Analytical P99 Formula**
+Equation 15 (P99 Latency) in our documentation is based on a Normal approximation. **This is valid only for light-tailed distributions.** For heavy-tailed workloads (Pareto), this formula significantly underestimates tail latency. In these cases, we rely on **Extreme Value Theory (EVT)** for accurate estimation.
+
 ## Project Structure
 
 ```

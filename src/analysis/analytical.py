@@ -346,10 +346,55 @@ class MGNAnalytical:
         R99 = mean_R + 2.33 * sigma_R
         return R99
 
-    def p99_response_time_improved(self,
-                                   method: str = "evt",
-                                   empirical_data: Optional[np.ndarray] = None,
-                                   threshold_percentile: float = 0.90) -> float:
+    def p99_response_time_heavy_tail(self) -> float:
+        """
+        Asymptotic P99 approximation for Heavy-Tailed (Pareto) queues.
+        
+        Derivation:
+        For M/G/1 with Pareto service time S ~ Pareto(α, xm), the tail of the
+        waiting time distribution P(W > t) is asymptotically:
+        
+        P(W > t) ≈ [λ/(1-ρ)] * [xm^α / (α-1)] * t^{-(α-1)}
+        
+        Inverting this for the p-th percentile (where P(W > t) = 1-p):
+        t_p ≈ [ (λ * xm^α) / ((1-ρ)(α-1)(1-p)) ] ^ (1/(α-1))
+        
+        For heavy tails (1 < α < 2), waiting time dominates service time,
+        so R99 ≈ W99.
+        
+        This method:
+        1. Estimates effective α from CV² (assuming Pareto service)
+        2. Estimates scale xm from E[S] and α
+        3. Applies the asymptotic formula
+        """
+        # 1. Estimate α from CV²
+        # CV² = 1 / (α(α-2))  =>  α² - 2α - 1/CV² = 0
+        cv_sq = self.coefficient_of_variation()
+        if cv_sq <= 0:
+            return self.p99_response_time() # Fallback for deterministic/zero var
+            
+        # Quadratic formula: α = (2 + sqrt(4 + 4/CV²))/2 = 1 + sqrt(1 + 1/CV²)
+        alpha = 1.0 + np.sqrt(1.0 + 1.0/cv_sq)
+        
+        if alpha <= 1:
+            return float('inf') # Infinite mean
+            
+        # 2. Estimate xm (scale) from E[S]
+        # E[S] = α * xm / (α - 1)  =>  xm = E[S] * (α - 1) / α
+        xm = self.ES * (alpha - 1.0) / alpha
+        
+        # 3. Apply Asymptotic Formula for p=0.99
+        p = 0.99
+        term1 = self.lambda_ * (xm ** alpha)
+        term2 = (1.0 - self.rho) * (alpha - 1.0) * (1.0 - p)
+        
+        if term2 <= 0:
+            return float('inf') # Unstable or invalid
+            
+        w99 = (term1 / term2) ** (1.0 / (alpha - 1.0))
+        
+        # Total response time ≈ W99 (dominated by wait) + E[S] (small correction)
+        return w99 + self.ES
         """
         Improved P99 estimation for heavy-tailed distributions
 
@@ -431,6 +476,7 @@ class MGNAnalytical:
             'mean_waiting_time': self.mean_waiting_time_mgn(),
             'mean_response_time': self.mean_response_time(),
             'p99_response_time': self.p99_response_time(),
+            'p99_response_time_heavy_tail': self.p99_response_time_heavy_tail(),
         }
 
 
@@ -593,7 +639,9 @@ class TandemQueueAnalytical:
                  n1: int, mu1: float,
                  n2: int, mu2: float,
                  network_delay: float,
-                 failure_prob: float):
+                 failure_prob: float,
+                 cs_squared_1: float = 1.0,
+                 cs_squared_2: float = 1.0):
         """
         Args:
             lambda_arrival: Arrival rate at Stage 1 (λ)
@@ -603,6 +651,8 @@ class TandemQueueAnalytical:
             mu2: Receiver service rate (per server)
             network_delay: One-way network delay (D_link)
             failure_prob: Transmission failure probability (p)
+            cs_squared_1: CV² of service time at Stage 1 (default 1.0 for exponential)
+            cs_squared_2: CV² of service time at Stage 2 (default 1.0 for exponential)
         """
         self.lambda_ = lambda_arrival
         self.n1 = n1
@@ -611,6 +661,8 @@ class TandemQueueAnalytical:
         self.mu2 = mu2
         self.D_link = network_delay
         self.p = failure_prob
+        self.cs_squared_1 = cs_squared_1
+        self.cs_squared_2 = cs_squared_2
 
         # Stage 1 utilization
         self.rho1 = lambda_arrival / (n1 * mu1)
@@ -625,13 +677,23 @@ class TandemQueueAnalytical:
         if self.rho2 >= 1.0:
             raise ValueError(f"Stage 2 unstable: ρ₂ = {self.rho2:.3f} >= 1")
 
-        # Create M/M/N models for each stage
+        # Create M/M/N models for each stage (baseline)
         self.stage1_model = MMNAnalytical(self.lambda_, self.n1, self.mu1)
         self.stage2_model = MMNAnalytical(self.Lambda2, self.n2, self.mu2)
 
     def stage1_waiting_time(self) -> float:
-        """Mean waiting time at broker (Stage 1)"""
-        return self.stage1_model.mean_waiting_time()
+        """
+        Mean waiting time at broker (Stage 1)
+        
+        Uses Allen-Cunneen approximation for M/G/n if CV² != 1
+        """
+        # Baseline M/M/n waiting time
+        wq_mmn = self.stage1_model.mean_waiting_time()
+        
+        # Adjust for service variability (M/G/n approximation)
+        # Wq ≈ Wq(M/M/n) * (Ca² + Cs²)/2
+        # For Stage 1, arrivals are Poisson so Ca² = 1
+        return wq_mmn * (1.0 + self.cs_squared_1) / 2.0
 
     def stage1_service_time(self) -> float:
         """Mean service time at broker"""
@@ -641,23 +703,30 @@ class TandemQueueAnalytical:
         """Mean response time at broker (wait + service)"""
         return self.stage1_waiting_time() + self.stage1_service_time()
 
+    def stage1_output_variability(self) -> float:
+        """
+        Calculate squared coefficient of variation of the departure process (Cd²)
+        using Whitt's QNA approximation for M/G/m queues.
+        
+        Formula: Cd² = 1 + (ρ² / √m) * (Cs² - 1)
+        
+        Reference:
+        Whitt, W. (1983). "The Queueing Network Analyzer."
+        Bell System Technical Journal, 62(9), 2779-2815.
+        """
+        # For M/G/m, Ca² = 1 (Poisson arrivals)
+        # The formula simplifies to: Cd² = 1 + (ρ² / √m) * (Cs² - 1)
+        # Note: This assumes Ca²=1. If Ca²!=1, full formula is:
+        # Cd² = 1 + (1 - ρ²)(Ca² - 1) + (ρ²/√m)(Cs² - 1)
+        
+        term = (self.rho1 ** 2) / np.sqrt(self.n1)
+        cd_squared = 1.0 + term * (self.cs_squared_1 - 1.0)
+        return cd_squared
+
     def expected_network_time(self) -> float:
         """
         Expected network time including retries
-
         E[Network Time] = (2 + p) · D_link
-
-        Derivation:
-        - Initial transmission: D_link (broker → receiver)
-        - ACK/NACK: D_link (receiver → broker)
-        - Expected retries: p transmissions need retry
-        - Each retry adds D_link (send) + D_link (ack) = 2·D_link
-        - But simplified: (2 + p)·D_link captures average behavior
-
-        Examples:
-        - p=0 (no failures): 2·D_link (send + ack only)
-        - p=0.2: 2.2·D_link (20% higher due to retries)
-        - p=0.5: 2.5·D_link (50% higher due to retries)
         """
         return (2 + self.p) * self.D_link
 
@@ -665,12 +734,32 @@ class TandemQueueAnalytical:
         """
         Mean waiting time at receiver (Stage 2)
 
-        CRITICAL: Uses Λ₂ = λ/(1-p) as arrival rate!
-
-        This is HIGHER than λ because failed transmissions retry,
-        effectively increasing the load on Stage 2.
+        CRITICAL IMPROVEMENT:
+        Instead of assuming Poisson arrivals (M/M/n), we use the output variability
+        from Stage 1 to approximate the arrival variability at Stage 2.
+        
+        Approximations used:
+        1. Stage 2 Arrival Variability (Ca,2²):
+           We approximate Ca,2² ≈ Cd,1² (Stage 1 output variability).
+           This ignores the smoothing/burstiness effects of the network and retries,
+           but is a much better first-order approximation than assuming Ca,2² = 1.
+           
+        2. Waiting Time (G/G/n):
+           We use Allen-Cunneen approximation:
+           Wq ≈ Wq(M/M/n) * (Ca² + Cs²)/2
         """
-        return self.stage2_model.mean_waiting_time()
+        # 1. Calculate input variability for Stage 2
+        # Approximate Ca,2² as Stage 1 output variability
+        ca_squared_2 = self.stage1_output_variability()
+        
+        # 2. Get baseline M/M/n waiting time (using effective arrival rate Λ₂)
+        wq_mmn = self.stage2_model.mean_waiting_time()
+        
+        # 3. Apply Allen-Cunneen approximation
+        # Wq ≈ Wq(M/M/n) * (Ca,2² + Cs,2²)/2
+        correction_factor = (ca_squared_2 + self.cs_squared_2) / 2.0
+        
+        return wq_mmn * correction_factor
 
     def stage2_service_time(self) -> float:
         """Mean service time at receiver"""
@@ -683,17 +772,7 @@ class TandemQueueAnalytical:
     def total_message_delivery_time(self) -> float:
         """
         Total end-to-end message delivery time
-
         T_total = W₁ + S₁ + (2+p)·D_link + W₂ + S₂
-
-        where:
-          W₁ = waiting time at broker
-          S₁ = service time at broker = 1/μ₁
-          (2+p)·D_link = expected network time (send + ack + retries)
-          W₂ = waiting time at receiver
-          S₂ = service time at receiver = 1/μ₂
-
-        This is Equation (X) from Li et al. (2015)
         """
         W1 = self.stage1_waiting_time()
         S1 = self.stage1_service_time()
@@ -712,15 +791,17 @@ class TandemQueueAnalytical:
             # System parameters
             'lambda': self.lambda_,
             'Lambda2': self.Lambda2,
-            'Lambda2_increase': (self.Lambda2 / self.lambda_ - 1) * 100,  # % increase
+            'Lambda2_increase': (self.Lambda2 / self.lambda_ - 1) * 100,
             'rho1': self.rho1,
             'rho2': self.rho2,
+            'cs_squared_1': self.cs_squared_1,
+            'cs_squared_2': self.cs_squared_2,
 
             # Stage 1 metrics
             'stage1_mean_wait': self.stage1_waiting_time(),
             'stage1_mean_service': self.stage1_service_time(),
             'stage1_mean_response': self.stage1_response_time(),
-            'stage1_mean_queue_length': self.stage1_model.mean_queue_length(),
+            'stage1_output_cv_squared': self.stage1_output_variability(),
 
             # Network metrics
             'expected_network_time': self.expected_network_time(),
@@ -730,33 +811,25 @@ class TandemQueueAnalytical:
             'stage2_mean_wait': self.stage2_waiting_time(),
             'stage2_mean_service': self.stage2_service_time(),
             'stage2_mean_response': self.stage2_response_time(),
-            'stage2_mean_queue_length': self.stage2_model.mean_queue_length(),
 
             # End-to-end metrics
             'total_delivery_time': self.total_message_delivery_time(),
         }
 
     def compare_stages(self) -> None:
-        """
-        Print comparison showing Stage 2 has higher load
-
-        Demonstrates the key insight: transmission failures increase
-        Stage 2 arrival rate!
-        """
+        """Print comparison showing Stage 2 load and variability"""
         print(f"\n{'='*70}")
-        print(f"Tandem Queue Analysis: Stage Comparison")
+        print(f"Tandem Queue Analysis: Stage Comparison (QNA Approximation)")
         print(f"{'='*70}")
 
         print(f"\nArrival Rates:")
         print(f"  Stage 1: λ₁ = {self.lambda_:.2f} msg/sec")
-        print(f"  Stage 2: Λ₂ = λ/(1-p) = {self.Lambda2:.2f} msg/sec")
-        print(f"  Increase: {((self.Lambda2/self.lambda_ - 1)*100):.1f}% higher at Stage 2!")
+        print(f"  Stage 2: Λ₂ = {self.Lambda2:.2f} msg/sec (+{((self.Lambda2/self.lambda_ - 1)*100):.1f}%)")
 
-        print(f"\nUtilization:")
-        print(f"  Stage 1: ρ₁ = {self.rho1:.3f}")
-        print(f"  Stage 2: ρ₂ = {self.rho2:.3f}")
-        if self.rho2 > self.rho1:
-            print(f"  ⚠️  Stage 2 is MORE loaded than Stage 1 (bottleneck!)")
+        print(f"\nVariability (CV²):")
+        print(f"  Stage 1 Service: {self.cs_squared_1:.2f}")
+        print(f"  Stage 1 Output:  {self.stage1_output_variability():.2f} (Becomes Stage 2 Input!)")
+        print(f"  Stage 2 Service: {self.cs_squared_2:.2f}")
 
         print(f"\nWaiting Times:")
         print(f"  Stage 1: W₁ = {self.stage1_waiting_time():.6f} sec")
@@ -764,10 +837,6 @@ class TandemQueueAnalytical:
 
         print(f"\nTotal End-to-End Latency:")
         print(f"  T_total = {self.total_message_delivery_time():.6f} sec")
-        print(f"  Breakdown:")
-        print(f"    Stage 1: {self.stage1_response_time():.6f} sec ({self.stage1_response_time()/self.total_message_delivery_time()*100:.1f}%)")
-        print(f"    Network: {self.expected_network_time():.6f} sec ({self.expected_network_time()/self.total_message_delivery_time()*100:.1f}%)")
-        print(f"    Stage 2: {self.stage2_response_time():.6f} sec ({self.stage2_response_time()/self.total_message_delivery_time()*100:.1f}%)")
         print(f"{'='*70}\n")
 
 

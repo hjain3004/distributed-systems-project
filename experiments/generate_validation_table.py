@@ -299,10 +299,11 @@ class PaperValidationTableGenerator:
         print(markdown)
 
         # Save to file
-        with open('PAPER_VALIDATION_TABLE.md', 'w') as f:
+        os.makedirs('results/tables', exist_ok=True)
+        with open('results/tables/PAPER_VALIDATION_TABLE.md', 'w') as f:
             f.write(markdown)
 
-        print("\n✓ Markdown table saved to: PAPER_VALIDATION_TABLE.md")
+        print("\n✓ Markdown table saved to: results/tables/PAPER_VALIDATION_TABLE.md")
 
         return markdown
 

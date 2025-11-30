@@ -110,7 +110,9 @@ class TandemQueueSystem:
 
         # Stage 1: Broker
         self.broker_threads = simpy.Resource(env, capacity=config.n1)
-        self.broker_service_rate = config.mu1
+        # Service distributions
+        self.broker_distribution = self._create_distribution(config.mu1, getattr(config, 'distribution', 'exponential'))
+        self.receiver_distribution = self._create_distribution(config.mu2, getattr(config, 'distribution', 'exponential'))
 
         # Network Layer (with callback for Stage 2 arrival tracking)
         self.network = NetworkLayer(
@@ -122,7 +124,6 @@ class TandemQueueSystem:
 
         # Stage 2: Receiver
         self.receiver_threads = simpy.Resource(env, capacity=config.n2)
-        self.receiver_service_rate = config.mu2
 
         # Metrics
         self.metrics = TandemMetrics()
@@ -131,11 +132,41 @@ class TandemQueueSystem:
         self.message_id = 0
         self.messages_in_warmup = 0
 
+    def _create_distribution(self, rate: float, dist_type: str):
+        """Helper to create distribution object"""
+        # Import here to avoid circular imports if any
+        from ..core.distributions import ExponentialService, ParetoService, ErlangService
+        
+        # Default to exponential if not specified in config
+        if dist_type == 'exponential':
+            return ExponentialService(rate)
+        elif dist_type == 'pareto':
+            # Use default alpha=2.5 if not in config, calculate scale to match mean
+            alpha = getattr(self.config, 'alpha', 2.5)
+            target_mean = 1.0 / rate
+            scale = target_mean * (alpha - 1) / alpha
+            return ParetoService(alpha, scale)
+        elif dist_type == 'erlang':
+            k = getattr(self.config, 'erlang_k', 2)
+            return ErlangService(k, k * rate)
+        else:
+            return ExponentialService(rate)
+
     def _on_stage2_arrival_attempt(self, message_id, attempt_num):
         """
         Callback when a transmission attempt is made to Stage 2.
+        
+        CRITICAL IMPLEMENTATION DETAIL:
         This tracks the TOTAL arrival rate at Stage 2, including retries.
-        This is what makes Λ₂ = λ/(1-p) instead of just λ.
+        Every time the network layer attempts to send a message (initial or retry),
+        it triggers this callback.
+        
+        Therefore:
+        Count(Stage 2 Arrivals) = Count(Initial Attempts) + Count(Retries)
+                                = λ + λ * p + λ * p^2 + ...
+                                = λ / (1 - p)
+                                
+        This explicitly satisfies Equation 3 from Li et al. (2015): Λ₂ = λ/(1-p).
         """
         if not self.is_warmup():
             # Record each transmission attempt as a Stage 2 arrival
@@ -176,7 +207,7 @@ class TandemQueueSystem:
             wait1 = wait_start - arrival_time
 
             # Service at broker
-            service1 = np.random.exponential(1.0 / self.broker_service_rate)
+            service1 = self.broker_distribution.sample()
             yield self.env.timeout(service1)
 
             stage1_complete = self.env.now
@@ -207,7 +238,7 @@ class TandemQueueSystem:
             wait2 = wait2_start - stage2_arrival
 
             # Service at receiver
-            service2 = np.random.exponential(1.0 / self.receiver_service_rate)
+            service2 = self.receiver_distribution.sample()
             yield self.env.timeout(service2)
 
             stage2_complete = self.env.now
