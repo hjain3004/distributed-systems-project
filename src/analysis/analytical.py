@@ -641,7 +641,8 @@ class TandemQueueAnalytical:
                  network_delay: float,
                  failure_prob: float,
                  cs_squared_1: float = 1.0,
-                 cs_squared_2: float = 1.0):
+                 cs_squared_2: float = 1.0,
+                 consistency_mode: str = "out_of_order"):
         """
         Args:
             lambda_arrival: Arrival rate at Stage 1 (λ)
@@ -653,6 +654,7 @@ class TandemQueueAnalytical:
             failure_prob: Transmission failure probability (p)
             cs_squared_1: CV² of service time at Stage 1 (default 1.0 for exponential)
             cs_squared_2: CV² of service time at Stage 2 (default 1.0 for exponential)
+            consistency_mode: "in_order" or "out_of_order" (default)
         """
         self.lambda_ = lambda_arrival
         self.n1 = n1
@@ -663,6 +665,11 @@ class TandemQueueAnalytical:
         self.p = failure_prob
         self.cs_squared_1 = cs_squared_1
         self.cs_squared_2 = cs_squared_2
+        self.consistency_mode = consistency_mode
+
+        # Consistency penalty factor (from Li et al., 2015)
+        # In-order delivery adds ~50% overhead to waiting times
+        self.consistency_penalty = 1.5 if consistency_mode == "in_order" else 1.0
 
         # Stage 1 utilization
         self.rho1 = lambda_arrival / (n1 * mu1)
@@ -693,7 +700,11 @@ class TandemQueueAnalytical:
         # Adjust for service variability (M/G/n approximation)
         # Wq ≈ Wq(M/M/n) * (Ca² + Cs²)/2
         # For Stage 1, arrivals are Poisson so Ca² = 1
-        return wq_mmn * (1.0 + self.cs_squared_1) / 2.0
+        # Wq ≈ Wq(M/M/n) * (Ca² + Cs²)/2
+        # For Stage 1, arrivals are Poisson so Ca² = 1
+        base_wq = wq_mmn * (1.0 + self.cs_squared_1) / 2.0
+        
+        return base_wq * self.consistency_penalty
 
     def stage1_service_time(self) -> float:
         """Mean service time at broker"""
@@ -759,7 +770,11 @@ class TandemQueueAnalytical:
         # Wq ≈ Wq(M/M/n) * (Ca,2² + Cs,2²)/2
         correction_factor = (ca_squared_2 + self.cs_squared_2) / 2.0
         
-        return wq_mmn * correction_factor
+        # Wq ≈ Wq(M/M/n) * (Ca,2² + Cs,2²)/2
+        correction_factor = (ca_squared_2 + self.cs_squared_2) / 2.0
+        
+        base_wq = wq_mmn * correction_factor
+        return base_wq * self.consistency_penalty
 
     def stage2_service_time(self) -> float:
         """Mean service time at receiver"""

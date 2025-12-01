@@ -11,6 +11,22 @@ This project extends queueing theory research to model cloud-based message broke
 - **Distributed systems protocols** (Raft, Vector Clocks, Two-Phase Commit)
 - **Discrete-event simulation** using SimPy with statistical rigor (20+ replications)
 
+## Relationship to Base Paper (Li et al., 2015)
+
+This project is a **Critique and Extension** of the base paper, not a simple replication.
+
+### The Strategic Pivot: Workload vs. Consistency
+The base paper focuses heavily on the trade-off between **In-Order** and **Out-of-Order** message delivery. They found that In-Order delivery reduces performance by ~50% (1.5x penalty).
+
+**Our Research Finding:**
+While Consistency is important, our analysis revealed a much larger factor: **Workload Distribution**.
+*   The base paper assumes **Exponential** service times (M/M/N).
+*   Real cloud systems exhibit **Heavy-Tailed** distributions (M/G/N).
+*   **Impact:** Heavy tails cause latency spikes of **300% to 1000% (3x - 10x)**.
+
+**Conclusion:**
+We chose to focus our project on the **"Reality Gap" (Heavy Tails)** because it has a **10x impact** on performance, whereas the Consistency choice only has a **1.5x impact**. We prioritized solving the "First-Order" problem (Workload) over the "Second-Order" problem (Consistency).
+
 ## Project Overview
 
 Based on research by Li et al. (2015) on cloud message queueing services, this project provides:

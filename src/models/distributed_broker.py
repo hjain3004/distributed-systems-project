@@ -51,10 +51,35 @@ class StorageNode:
 
     def receive_message(self) -> Optional[CloudMessage]:
         """Receive message from this node"""
-        message = self.visibility_manager.receive_message()
-        if message:
-            self.messages_received += 1
-        return message
+        if self.ordering.mode == "in_order":
+            # In-Order Delivery: HOL Blocking Logic
+            # 1. Peek at the next EXPECTED message from ordering buffer
+            next_msg = self.ordering.peek()
+            
+            if next_msg is None:
+                # Buffer empty or next sequence not yet arrived
+                return None
+                
+            # 2. Check if this specific message is available and visible
+            if self.visibility_manager.is_visible(next_msg.id):
+                # 3. Receive it
+                message = self.visibility_manager.receive_specific_message(next_msg.id)
+                if message:
+                    # 4. Advance sequence in ordering buffer
+                    self.ordering.dequeue()
+                    self.messages_received += 1
+                return message
+            else:
+                # HOL Blocking: Next expected message is not visible
+                # (It might be processing, or not yet in visibility manager)
+                # print(f"HOL Blocking: Waiting for {next_msg.id} (Queue Index: {self.ordering.queue_index})")
+                return None
+        else:
+            # Out-of-Order: Just get any visible message
+            message = self.visibility_manager.receive_message()
+            if message:
+                self.messages_received += 1
+            return message
 
     def acknowledge_message(self, message_id: int) -> bool:
         """Acknowledge message on this node"""

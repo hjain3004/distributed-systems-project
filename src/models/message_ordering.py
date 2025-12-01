@@ -48,9 +48,13 @@ class MessageOrdering:
         """
         if self.mode == "in_order":
             # Maintain strict FIFO order
-            message.vector_clock = [self.sequence_number]
+            # If message already has a sequence number (from producer), use it
+            # Otherwise, assign one (local ordering)
+            if not hasattr(message, 'vector_clock') or not message.vector_clock:
+                message.vector_clock = [self.sequence_number]
+                self.sequence_number += 1
+            
             self.messages[message.id] = message
-            self.sequence_number += 1
         else:
             # Out-of-order: no sequence guarantee
             self.messages[message.id] = message
@@ -112,11 +116,16 @@ class MessageOrdering:
             return None
 
         if self.mode == "in_order":
-            message_id = next(iter(self.messages))
+            # In-order: Must return the NEXT EXPECTED message (queue_index)
+            # If it's not here, return None (HOL Blocking)
+            for message in self.messages.values():
+                if hasattr(message, 'vector_clock') and len(message.vector_clock) > 0:
+                    if message.vector_clock[0] == self.queue_index:
+                        return message
+            return None
         else:
             message_id = random.choice(list(self.messages.keys()))
-
-        return self.messages[message_id]
+            return self.messages[message_id]
 
     def get_visible_messages(self, current_time: float) -> List[CloudMessage]:
         """

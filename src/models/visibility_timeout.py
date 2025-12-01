@@ -68,8 +68,9 @@ class VisibilityTimeoutManager:
         if not self.visible_messages:
             return None
 
-        # Get first visible message (FIFO for now)
-        message_id = next(iter(self.visible_messages))
+        # Get random visible message (Out-of-Order simulation)
+        import random
+        message_id = random.choice(list(self.visible_messages.keys()))
         message = self.visible_messages.pop(message_id)
 
         # Make invisible and start timer (Paper Figure 9)
@@ -83,6 +84,31 @@ class VisibilityTimeoutManager:
 
         self.total_receives += 1
 
+        return message
+
+    def is_visible(self, message_id: int) -> bool:
+        """Check if a specific message is visible"""
+        return message_id in self.visible_messages
+
+    def receive_specific_message(self, message_id: int) -> Optional[CloudMessage]:
+        """
+        Receive a SPECIFIC message (for in-order delivery)
+        """
+        if message_id not in self.visible_messages:
+            return None
+
+        message = self.visible_messages.pop(message_id)
+
+        # Make invisible and start timer
+        message.make_invisible(self.env.now)
+        self.invisible_messages[message.id] = message
+
+        # Start visibility timeout timer
+        self.timers[message.id] = self.env.process(
+            self._visibility_timer(message)
+        )
+
+        self.total_receives += 1
         return message
 
     def _visibility_timer(self, message: CloudMessage):

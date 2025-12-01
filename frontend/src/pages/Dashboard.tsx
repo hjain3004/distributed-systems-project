@@ -138,6 +138,31 @@ export const Dashboard = () => {
             </CardContent>
           </Card>
         </motion.div>
+
+        <motion.div variants={item}>
+          <Card className="h-full hover:shadow-lg transition-shadow border-primary/20">
+            <CardHeader>
+              <div className="w-12 h-12 rounded-lg bg-orange-100 dark:bg-orange-900/20 flex items-center justify-center mb-4">
+                <Activity className="h-6 w-6 text-orange-600 dark:text-orange-400" />
+              </div>
+              <CardTitle>Tandem Queue Model</CardTitle>
+              <CardDescription>
+                Two-stage reliability analysis
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <p className="text-sm text-muted-foreground">
+                Analyze the impact of network failures and retransmissions on system load (Traffic Inflation).
+              </p>
+              <Link to="/tandem">
+                <Button className="w-full group" variant="secondary">
+                  Open Model
+                  <ArrowRight className="ml-2 h-4 w-4 transition-transform group-hover:translate-x-1" />
+                </Button>
+              </Link>
+            </CardContent>
+          </Card>
+        </motion.div>
       </motion.div>
 
       {/* Key Features / Stats */}
