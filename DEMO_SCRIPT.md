@@ -1,116 +1,63 @@
 # Project Demo Script
-**Goal:** Demonstrate the "Reality Gap" between standard models (M/M/n) and realistic heavy-tailed models (M/G/n), and show how your Tandem Queue simulation solves it.
+**Goal:** Demonstrate the "Reality Gap" between standard models (M/M/n) and realistic heavy-tailed models (M/G/n), and show how your "Engineering Tools" solve it.
 
 ---
 
-## Phase 0: Setup (Before Recording)
-**Terminal 1 (Backend):**
+## Phase 0: Setup (One-Click)
+**Terminal:**
 ```bash
 cd /Users/himanshu_jain/273/distributed-systems-project
-python3 start_backend.py
+./start.sh
 ```
-
-**Terminal 2 (Frontend):**
-```bash
-cd /Users/himanshu_jain/273/distributed-systems-project/frontend
-npm run dev
-```
-*Open http://localhost:5173 in your browser.*
+*Open http://localhost:4000 in your browser.*
 
 ---
 
-## Phase 1: The Hook (Dashboard)
-**Screen:** `Dashboard` (Home Page)
+## Phase 1: The Baseline (Control Center)
+**Screen:** `Control Center`
 **Action:**
-1.  Start on the Dashboard. Point out the modern, clean UI (Shadcn/Tailwind).
-2.  **Say:** "This is the Distributed Systems Modeling Platform. It allows us to compare theoretical models against real-world simulations."
-3.  Highlight the three main modules: M/M/N (Standard), M/G/N (Advanced), and Comparison.
+1.  Start on the **Control Center**.
+2.  Select **"Baseline (Standard)"** from the Scenario dropdown.
+3.  **Say:** "We start with the baseline. This is the standard M/M/N model. Latency is stable at 200ms."
 
-## Phase 2: The Baseline (M/M/N Calculator)
-**Screen:** `M/M/N Calculator`
+## Phase 2: The Hook (Control Center)
+**Screen:** `Control Center` (The Storyteller)
 **Action:**
-1.  Click "Open Calculator" on the M/M/N card.
-2.  **Input:**
-    *   Arrival Rate ($\lambda$): 30
-    *   Service Rate ($\mu$): 10
-    *   Servers ($N$): 4
-3.  **Observe:**
-    *   Utilization ($\rho$): 0.75 (75%)
-    *   Mean Wait Time: Low (e.g., ~0.02s)
-4.  **Say:** "This is the standard model used in the base paper. It assumes everything is smooth (Exponential). The wait times are very low."
+1.  **Action:** Select **"The Crash (Pareto Workload)"** from the Scenario dropdown.
+2.  **Observe:** The graph spikes red. The servers turn red.
+3.  **Say:** "Watch what happens when a heavy-tailed workload hits. The system crashes. Standard math didn't predict this."
 
-## Phase 3: The Problem (M/G/N Calculator)
-**Screen:** `M/G/N Calculator`
+## Phase 3: The Fix (Capacity Planner)
+**Screen:** `Capacity Planner`
 **Action:**
-1.  Navigate to "M/G/N Calculator".
-2.  **Input:**
-    *   Arrival Rate: 30
-    *   Service Rate: 10
-    *   Servers: 4
-    *   **CV² (Variability):** Change from 1 (Exponential) to **10 (Heavy Tail)**.
-3.  **Observe:**
-    *   Mean Wait Time: **Explodes** (increases by ~5-10x).
-4.  **Say:** "But real cloud systems have 'Heavy Tails'. When we increase the variability ($CV^2$), the standard model breaks. The wait times skyrocket."
+1.  Navigate to **Capacity Planner**.
+2.  Click **"Inverse Solver"**.
+3.  **Input:** Target Latency = 200ms, Traffic Load = 400, Server Capacity = 30.
+4.  **Observe:** It calculates "Required Servers: 14".
+5.  **Say:** "How do we fix it? We use the Inverse Solver. It tells us exactly how many servers we need to handle the load."
 
-## Phase 3b: The Explosion (Interactive Demo)
+## Phase 4: The Consequence (The Blast Radius)
+**Screen:** `The Blast Radius`
 **Action:**
-1.  Drag the **Shape Parameter ($\alpha$)** slider left to **2.1**.
-2.  **Observe:**
-    *   **Variability ($CV^2$)** jumps to **4.76**.
-    *   **Penalty Factor** jumps to **2.88x**.
-    *   **Mean Wait** jumps to **~147ms** (3x higher than baseline!).
-3.  **Say:** "Watch what happens when I make the tail slightly heavier ($\alpha=2.1$). The variability explodes to 4.76. Suddenly, our wait time triples. This is the 'Reality Gap'—standard models miss this completely."
+1.  Navigate to **The Blast Radius**.
+2.  Toggle Workload to **"Bursty"**.
+3.  **Observe:** Node 2 has much bigger spikes than Node 1.
+4.  **Say:** "Why did it crash so hard? Variance Amplification. A small spike here causes a massive explosion downstream."
 
-## Phase 4: The Proof (Comparison Page)
-**Screen:** `Model Comparison`
+## Phase 5: The Proof (Reality Gap Explorer)
+**Screen:** `Reality Gap Explorer`
 **Action:**
-1.  Navigate to "Model Comparison".
-2.  **Input:** Same parameters ($\lambda=30, \mu=10, N=4$).
-3.  **Click:** "Run Comparison".
-4.  **Show Chart:** Point to the bar chart showing "Analytical" vs "Simulation".
-5.  **Say:** "Here we compare the math against a real discrete-event simulation. You can see the simulation confirms the high latency## Phase 6: The "Cost of Consistency" (The Save)
-
-**Goal:** If the professor asks "What about In-Order delivery?", you use this.
-
-**Action:**
-1.  Open the **Tandem Queue** page.
-2.  Scroll down to the **"Consistency Model"** toggle.
-3.  Say: *"We also investigated the cost of strict ordering."*
-4.  Flip the switch to **"In-Order"**.
-
-**Observation:**
-*   Latency **increases** (approx 13-15%).
-*   Explain: *"This is the **Head-of-Line Blocking** effect. Fast messages get stuck behind slow ones."*
-
-**The "Mic Drop" Line:**
-*"Our experiments showed that enforcing strict FIFO adds ~13% latency overhead. This validates why many cloud systems prefer eventual consistency (Out-of-Order) for higher throughput."*
+1.  Navigate to **Reality Gap Explorer**.
+2.  Drag the **Variance Slider** to the right.
+3.  **Observe:** The Red Line (Reality) pulls away from the Blue Line (Math).
+4.  **Say:** "This is the Reality Gap. The math (Blue) says we're fine. Reality (Red) says we're dead. Our simulation tells the truth."
 
 ---
 
 ## Q&A Cheat Sheet (The "Defense Translation Table")
 
-| If Professor Says... | You Do NOT Say... | You Say... |
-| :--- | :--- | :--- |
-| "Your throughput is terrible compared to the paper." | "I know, Python is slow, sorry." | "Correct. The paper assumes infinite buffer capacity. I modeled finite buffers, which creates realistic backpressure and throttles throughput." |
-| "Why is the P99 latency so erratic?" | "My simulation is unstable." | "That is the signature of a Pareto distribution. If it were stable, it would be wrong. The erratic nature proves I am correctly simulating heavy-tailed traffic." |
-| "The paper achieved 500 req/s. You only got 120." | "I need to optimize my code." | "The paper achieved 500 req/s by allowing data inconsistency. My 120 req/s is the verified speed limit for fully consistent, ordered data." |
-| "Your system is slower than the paper." | "I failed to optimize." | "I traded speed for **Fidelity**. I modeled the network RTT and 2PC locking that the paper ignored." |
-
-See `DEFENSE_STRATEGY.md` for the full playbook."
-
-## Phase 5: The Solution (Tandem Queue)
-**Screen:** `Tandem Queue Model`
-**Action:**
-1.  Set **Global Arrival ($\lambda$)** to **31**.
-2.  Set **Failure Probability ($p$)** to **10%**.
-3.  **Say:** "Finally, here is our contribution: The Tandem Queue Model."
-4.  **Point to 'Traffic Inflation':** "Look at this. We send **31** requests, but Stage 2 receives **34.4**. Why? Because of the 10% retries. We call this **'Traffic Inflation'**."
-5.  **Point to Utilization:** "Stage 1 is healthy at **77%**, but Stage 2 is overheating at **86%**. This is the hidden danger—retries kill your downstream services first."
-6.  **Conclusion:** "Our model predicts this cascading failure *before* it happens, allowing engineers to provision extra capacity for Stage 2." Even with 10% failure, our simulation accurately predicts the load."
-
----
-
-## Demo Tips
-*   **Keep it moving:** Don't spend too long on one screen.
-*   **Focus on the Delta:** The most important thing is the *difference* between M/M/N and M/G/N.
-*   **Use the Visuals:** Point to the charts, not just the numbers.
+| If Professor Says... | You Say... |
+| :--- | :--- |
+| "Your throughput is low." | "I modeled finite buffers and network RTT, which creates realistic backpressure. It's a trade-off for fidelity." |
+| "Why is the graph so erratic?" | "That's the signature of a Pareto distribution. If it were smooth, it would be wrong." |
+| "Why not use CPN Tools?" | "SimPy allows us to model complex protocols like Raft and 2PC, which are impossible in CPN." |

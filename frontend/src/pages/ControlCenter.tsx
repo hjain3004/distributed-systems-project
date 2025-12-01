@@ -97,9 +97,10 @@ export const ControlCenter = () => {
         return () => window.removeEventListener('keydown', handleKeyDown);
     }, [updateConfig, setIsRunning]);
 
-    // --- Animation Loop ---
+    // --- Refs for Simulation State ---
     const requestRef = useRef<number>();
-    const configRef = useRef(config); // Ref to access latest config in closure
+    const configRef = useRef(config);
+    const p99Ref = useRef(250); // Track P99 across frames to avoid stale closures
 
     // Keep configRef in sync
     useEffect(() => {
@@ -284,12 +285,16 @@ export const ControlCenter = () => {
             }
         }
 
+        // Update P99 Ref (Decaying Peak)
+        p99Ref.current = Math.max(p99Ref.current * 0.99, currentLatency);
+
         // Update Data
         setData(prev => {
             const newData = [...prev, {
                 time: new Date().toLocaleTimeString(),
                 meanLatency: currentLatency,
                 vipLatency: currentConfig.enableQoS ? vipLatency : undefined,
+                p99Latency: p99Ref.current,
                 theoretical: theoreticalLatency
             }];
             if (newData.length > maxDataPoints) newData.shift();
@@ -301,7 +306,7 @@ export const ControlCenter = () => {
             ...prev,
             meanLatency: (prev.meanLatency * 0.9) + (currentLatency * 0.1), // Smoothing
             vipLatency: currentConfig.enableQoS ? 5 + (Math.random() * 2) : undefined, // Client-side sim
-            p99Latency: Math.max(prev.p99Latency * 0.99, currentLatency), // Decay peak
+            p99Latency: p99Ref.current,
             throughput: currentConfig.lambda + (Math.random() * 5),
             dropRate: currentConfig.loadShedding && currentConfig.distribution === 'pareto' && Math.random() > 0.8 ?
                 (prev.dropRate * 0.9 + 5) : // Simulated drops
@@ -350,11 +355,14 @@ export const ControlCenter = () => {
 
                 {/* Distribution Selector */}
                 <div className="space-y-2">
-                    <Label>Service Distribution (The Paper's Wish)</Label>
+                    <Label>Traffic Workload</Label>
                     <Select
                         value={config.distribution}
                         onValueChange={(v: any) => updateConfig({ distribution: v })}
                     >
+                        <SelectTrigger>
+                            <SelectValue placeholder="Select Workload" />
+                        </SelectTrigger>
                         <SelectContent>
                             <SelectItem value="exponential">Exponential (Baseline)</SelectItem>
                             <SelectItem value="erlang_k2">Erlang-2 (Low Variance)</SelectItem>

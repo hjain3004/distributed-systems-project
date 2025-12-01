@@ -58,8 +58,7 @@ export const TandemQueue = () => {
         const response = await axios.post('/api/analytical/tandem', {
           arrival_rate: lambda,
           n1: n1, mu1: mu1, n2: n2, mu2: mu2,
-          network_delay: networkDelay, failure_prob: failureProb,
-          consistency_mode: 'out_of_order'
+          network_delay: networkDelay, failure_prob: failureProb
         });
         setMetrics(response.data.metrics);
       } catch (err) {

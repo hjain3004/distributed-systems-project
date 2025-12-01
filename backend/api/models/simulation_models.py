@@ -184,6 +184,7 @@ class DistributedSimulationRequest(BaseModel):
             }
         }
 
+class SimulationResponse(BaseModel):
     """Generic Simulation Response"""
     simulation_id: str
     status: str  # running, completed, failed

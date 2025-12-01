@@ -13,8 +13,13 @@ from datetime import datetime
 import sys
 import os
 
-# Add backend directory to path
-backend_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+# Add project root and backend directory to path
+import sys
+import os
+current_dir = os.path.dirname(os.path.abspath(__file__))
+backend_dir = os.path.dirname(os.path.dirname(current_dir))
+project_root = os.path.dirname(backend_dir)
+sys.path.append(project_root)
 sys.path.append(backend_dir)
 
 from api.services.simulation_service import SimulationService

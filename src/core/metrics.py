@@ -38,30 +38,30 @@ class SimulationMetrics:
 
         return {
             # Waiting time statistics
-            'mean_wait': np.mean(wait_times),
-            'median_wait': np.median(wait_times),
-            'std_wait': np.std(wait_times),
-            'p95_wait': np.percentile(wait_times, 95),
-            'p99_wait': np.percentile(wait_times, 99),
-            'max_wait': np.max(wait_times),
+            'mean_wait': float(np.mean(wait_times)),
+            'median_wait': float(np.median(wait_times)),
+            'std_wait': float(np.std(wait_times)),
+            'p95_wait': float(np.percentile(wait_times, 95)),
+            'p99_wait': float(np.percentile(wait_times, 99)),
+            'max_wait': float(np.max(wait_times)),
 
             # Response time statistics
-            'mean_response': np.mean(response_times),
-            'p50_response': np.percentile(response_times, 50),
-            'p95_response': np.percentile(response_times, 95),
-            'p99_response': np.percentile(response_times, 99),
+            'mean_response': float(np.mean(response_times)),
+            'p50_response': float(np.percentile(response_times, 50)),
+            'p95_response': float(np.percentile(response_times, 95)),
+            'p99_response': float(np.percentile(response_times, 99)),
 
             # Queue statistics
-            'mean_queue_length': np.mean(queue_lengths),
-            'max_queue_length': np.max(queue_lengths),
-            'p95_queue_length': np.percentile(queue_lengths, 95),
+            'mean_queue_length': float(np.mean(queue_lengths)),
+            'max_queue_length': float(np.max(queue_lengths)),
+            'p95_queue_length': float(np.percentile(queue_lengths, 95)),
 
             # Throughput
-            'throughput': len(self.wait_times) / (max(self.departure_times) - min(self.arrival_times)) if self.departure_times and self.arrival_times else 0,
+            'throughput': float(len(self.wait_times) / (max(self.departure_times) - min(self.arrival_times))) if self.departure_times and self.arrival_times else 0.0,
 
             # Service time statistics
-            'mean_service': np.mean(self.service_times) if self.service_times else 0,
-            'cv_service': np.std(self.service_times) / np.mean(self.service_times) if self.service_times and np.mean(self.service_times) > 0 else 0,
+            'mean_service': float(np.mean(self.service_times)) if self.service_times else 0.0,
+            'cv_service': float(np.std(self.service_times) / np.mean(self.service_times)) if self.service_times and np.mean(self.service_times) > 0 else 0.0,
         }
 
     def to_dataframe(self) -> pd.DataFrame:

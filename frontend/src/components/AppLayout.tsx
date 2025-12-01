@@ -25,10 +25,10 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
     const navItems = [
         { path: '/', label: 'Dashboard', icon: LayoutDashboard },
         { path: '/control', label: 'Control Center', icon: Activity },
-        { path: '/mmn', label: 'M/M/N Calculator', icon: Calculator },
+        { path: '/mmn', label: 'Capacity Planner', icon: Calculator },
         { path: '/mgn', label: 'M/G/N Calculator', icon: Activity },
-        { path: '/compare', label: 'Model Comparison', icon: GitCompare },
-        { path: '/tandem', label: 'Tandem Queue', icon: RefreshCw },
+        { path: '/compare', label: 'Reality Gap Explorer', icon: GitCompare },
+        { path: '/tandem', label: 'The Blast Radius', icon: RefreshCw },
     ];
 
     return (
