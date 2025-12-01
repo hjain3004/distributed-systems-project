@@ -1,0 +1,4 @@
+model,description,mean_wait_time
+M/M/1 Model,Paper Baseline,0.1666666666666666
+Our Simulation,Ground Truth,0.1903509814202468
+QNA Model,Upper Bound,0.4801587301587296

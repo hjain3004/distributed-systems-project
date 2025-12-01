@@ -1,0 +1,4 @@
+method,description,p99_value
+Normal Approx,Paper (Normal),4.25077588588678
+EVT Estimate,Ours (Heavy-Tail),7.563310215976891
+Empirical Truth,Simulation,7.812198971068925

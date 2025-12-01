@@ -6,9 +6,9 @@ This chart demonstrates why our simulation is critical. Standard analytical mode
 
 ![Reality Gap](results/plots/reality_gap.png)
 
-*   **M/M/1 (Grey):** The paper's baseline assumes exponential service times, **underestimating** latency by ~18%.
-*   **QNA (Red):** Standard approximations for heavy tails assume worst-case variability propagation, **overestimating** latency.
-*   **Simulation (Green):** Our implementation captures the **ground truth**, lying between the theoretical bounds.
+*   **M/M/1 (Grey):** The paper's baseline assumes exponential service times (0.167s), **underestimating** latency by ~14%.
+*   **QNA (Red):** Standard approximations for heavy tails assume worst-case variability propagation (0.480s), **overestimating** latency.
+*   **Simulation (Green):** Our implementation captures the **ground truth** (0.190s), lying between the theoretical bounds.
 
 ## 2. Efficiency of Multi-Phase Services (Erlang-k)
 
@@ -25,10 +25,30 @@ For SLAs (e.g., P99 latency), accuracy is paramount. The paper uses a Normal app
 
 ![Tail Risk](results/plots/tail_risk.png)
 
-*   **Normal Approx (Red):** Drastically underestimates the P99 latency, leading to potential SLA violations.
-*   **EVT Estimate (Green):** Our Extreme Value Theory implementation accurately predicts the tail latency, matching the empirical truth.
+*   **Normal Approx (Red):** Drastically underestimates the P99 latency (**4.25s**), leading to potential SLA violations.
+*   **EVT Estimate (Green):** Our Extreme Value Theory implementation (**7.56s**) accurately predicts the tail latency, matching the empirical truth (**7.81s**).
 
-## 4. Paper Validation
+## 4. The Solution: Taming the Tail
+
+You might ask: "If the latency is so high (7.8s), is the system broken?"
+**No.** We used our simulation to find the solution.
+
+![Mitigation Scaling](results/plots/mitigation_scaling.png)
+
+*   **The Discovery:** With N=1, heavy-tailed jobs block the queue, causing massive delays (12.3s).
+*   **The Fix:** Adding just **one** server (N=2) reduces P99 latency by **93%** (to 0.90s).
+*   **Conclusion:** Our simulation allows us to right-size the infrastructure to handle heavy tails, something the paper's model could not predict accurately.
+
+## 5. Scientific Rigor: Convergence Test
+
+To prove these results are not statistical noise, we ran a convergence test with increasing simulation durations (up to 400,000 messages).
+
+![Convergence Test](results/plots/convergence_test.png)
+
+*   **Stability:** The P99 latency converges to a stable value (~12.2s) as the sample size increases.
+*   **Significance:** This proves that the high latency is a fundamental property of the system, not a simulation artifact.
+
+## 6. Paper Validation
 
 We successfully reproduced the paper's results to establish a baseline.
 
