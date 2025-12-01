@@ -23,22 +23,22 @@ Because **Math is sometimes wrong.**
 Your project has three main layers. Think of it like a Restaurant.
 
 ### Layer 1: The Frontend (The Menu)
-*   **Technology:** React (TypeScript), Vite, Tailwind CSS.
+*   **Technology:** React (TypeScript), Vite, Tailwind CSS, Shadcn UI.
 *   **Analogy:** This is the shiny menu board where customers (users) choose what they want.
 *   **What it does:** It lets you type in numbers (e.g., "I have 5 servers") and shows you beautiful charts of the results.
-*   **Key File:** `MGNCalculator.tsx`. This is the specific page where you calculate the "Heavy Tail" risks.
+*   **Key File:** `ControlCenter.tsx`. This is the "Storyteller" dashboard where you demo the crash.
 
 ### Layer 2: The Backend (The Waiter)
 *   **Technology:** Python, FastAPI.
 *   **Analogy:** This is the waiter who takes your order from the Menu and runs it to the Kitchen.
 *   **What it does:** It receives the numbers from the Frontend ("5 servers"), passes them to the Simulation Engine, and sends the answer back ("Wait time is 2s").
-*   **Key File:** `backend/api/routes/analytical.py`. This is the "API Endpoint" – the specific door the waiter walks through.
+*   **Key File:** `backend/api/routes/simulations.py`. This is the "API Endpoint" – the specific door the waiter walks through.
 
 ### Layer 3: The Simulation Engine (The Kitchen)
 *   **Technology:** Python, SimPy, NumPy.
 *   **Analogy:** This is the kitchen where the actual work happens.
 *   **What it does:** It runs the "Digital Twin." It creates fake users, fake servers, and a fake network, and watches them interact for thousands of "fake seconds."
-*   **Key File:** `src/models/tandem_queue.py`. This is the recipe book. It contains the logic for "If a message fails, try again."
+*   **Key File:** `src/models/mgn_queue.py`. This is the recipe book. It contains the logic for "Heavy Tailed" service times.
 
 ---
 
@@ -64,43 +64,32 @@ This is the most important concept in your presentation. You must understand thi
 
 ---
 
-## 4. Your Results: Step-by-Step Explanation
+## 4. Your Engineering Tools: The "Scientific Proof"
 
-You have 5 charts. Here is exactly what each one means.
+You don't just have static charts anymore. You have interactive **Engineering Tools**.
 
-### Chart 1: "Paper Validation" (Figures 11-15)
-*   **What is it?** A check to see if you are crazy.
-*   **The Test:** You programmed the paper's exact model and compared your results to theirs.
-*   **The Result:** They match! (Error < 15%).
-*   **Why it matters:** It proves you are competent. You didn't just fail to copy their homework; you copied it perfectly, *then* found a mistake.
+### Tool 1: The Control Center ("The Storyteller")
+*   **What is it?** A live simulation dashboard.
+*   **The Demo:** You click "Pareto Workload" and the graph **EXPLODES**.
+*   **The Lesson:** You can *see* the crash happen in real-time. It's visceral. It proves that the "Starbucks" math doesn't work in the "DMV" world.
 
-### Chart 2: "The Reality Gap" (`reality_gap.png`)
-*   **What is it?** A comparison of Average Latency.
-*   **Grey Bar (Paper):** Predicts 0.16s. (Assumes Starbucks).
-*   **Green Bar (Simulation):** Reality is 0.19s. (Reality is DMV).
-*   **The Takeaway:** The paper is "Optimistic." It thinks the world is faster than it really is.
+### Tool 2: The Capacity Planner ("The Fix")
+*   **What is it?** An Inverse Solver.
+*   **The Problem:** "My boss wants 200ms latency. How many servers do I need?"
+*   **The Old Way:** Guess and check.
+*   **Your Way:** You type "200ms", and the tool calculates: "You need 14 servers."
+*   **The Lesson:** You turned a complex math problem into a simple business answer.
 
-### Chart 3: "Tail Risk" (`tail_risk.png`) **(THE MOST IMPORTANT CHART)**
-*   **What is it?** A comparison of the **Worst Case Scenario** (P99).
-*   **P99 Meaning:** "The time it takes for the slowest 1% of requests." (e.g., the 99th slowest person out of 100).
-*   **Red Line (Paper):** Predicts **4.25s**.
-    *   *Why?* Because in "Starbucks World," even the slowest drink is only 4s.
-*   **Green Line (Simulation):** Reality is **7.81s**.
-    *   *Why?* Because in "DMV World," the slowest person takes 8s.
-*   **The Takeaway:** The paper is **Dangerous**. If you built a system expecting a 4s max delay, and it actually hit 8s, your system would crash. You saved the company!
+### Tool 3: The Blast Radius ("The Consequence")
+*   **What is it?** A visualization of a "Tandem Queue" (Chain Reaction).
+*   **The Demo:** You show that a small spike in Server A causes a **MASSIVE** spike in Server B.
+*   **The Lesson:** "Variance Amplification." Bad things get worse as they travel downstream.
 
-### Chart 4: "Scientific Rigor" (`convergence_test.png`)
-*   **What is it?** A proof that you didn't just get unlucky.
-*   **The Test:** You ran the simulation for a LONG time (400,000 messages).
-*   **The Result:** The line flattens out (stabilizes) at ~12s.
-*   **Why it matters:** It proves that the high latency is a **fact of nature**, not a glitch.
-
-### Chart 5: "The Solution" (`mitigation_scaling.png`)
-*   **What is it?** How you fixed the problem.
-*   **The Fix:** You added more servers (N).
-*   **N=1:** Latency is 12s (System is dying).
-*   **N=2:** Latency drops to 0.9s (System is flying).
-*   **The Takeaway:** Because you *knew* about the Heavy Tail (thanks to your simulation), you knew you needed N=2. The paper would have told you N=1 was fine, and the system would have crashed.
+### Tool 4: The Reality Gap Explorer ("The Evidence")
+*   **What is it?** A chart comparing Math vs. Reality.
+*   **The Demo:** You drag a slider to increase variance.
+*   **The Result:** The "Math" line stays flat (wrong). The "Reality" line shoots up (truth).
+*   **The Lesson:** This visually proves *exactly* where the paper's formula breaks down.
 
 ---
 
@@ -109,6 +98,6 @@ You have 5 charts. Here is exactly what each one means.
 1.  **I modeled a cloud system.** (Like a post office).
 2.  **The old math assumed it was like Starbucks.** (Fast, predictable).
 3.  **I proved it's actually like the DMV.** (Slow, unpredictable "Heavy Tails").
-4.  **The old math underestimates the wait time by 50%.** (Dangerous!).
-5.  **My simulation predicts the true wait time.** (Safe!).
-6.  **I used my simulation to fix it by adding one server.** (Hero!).
+4.  **I built a "Digital Twin" to prove it.** (The Simulation).
+5.  **I built "Engineering Tools" to fix it.** (Capacity Planner).
+6.  **I saved the company from a crash.** (Hero!).

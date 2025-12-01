@@ -11,34 +11,33 @@
 │                     React Frontend (Port 4000)              │
 │  ┌──────────────────────────────────────────────────────┐   │
 │  │ App.tsx (Main Component)                             │   │
-│  │  ├─ Layout (Sidebar + Content)                       │   │
+│  │  ├─ AppLayout (Sidebar + Content)                    │   │
 │  │  ├─ Routing (React Router)                           │   │
-│  │  │  ├─ Dashboard                                     │   │
-│  │  │  ├─ Simulate                                      │   │
-│  │  │  ├─ Results                                       │   │
-│  │  │  └─ Distributed                                  │   │
+│  │  │  ├─ Dashboard (Overview)                          │   │
+│  │  │  ├─ Control Center (The Storyteller)              │   │
+│  │  │  ├─ Capacity Planner (M/M/N)                      │   │
+│  │  │  ├─ The Blast Radius (Tandem Queue)               │   │
+│  │  │  └─ Reality Gap Explorer (Comparison)             │   │
 │  │  └─ Services                                         │   │
-│  │     ├─ api.ts (HTTP calls)                           │   │
-│  │     └─ websocket.ts (Real-time updates)              │   │
+│  │     ├─ BackendService.ts (HTTP calls)                │   │
+│  │     └─ SimulationContext.tsx (Global State)          │   │
 │  └──────────────────────────────────────────────────────┘   │
 └─────────────────────┬──────────────────────────────────────┘
-                      │ HTTP/WebSocket
-                      │ (Axios + Socket.io)
+                      │ HTTP (Axios)
+                      │ Port 3100
                       ↓
 ┌─────────────────────────────────────────────────────────────┐
-│                  FastAPI Backend (Port 6000)                │
+│                  FastAPI Backend (Port 3100)                │
 │  ┌──────────────────────────────────────────────────────┐   │
 │  │ main.py (FastAPI App)                               │   │
 │  │  ├─ /api/simulations (M/M/N, M/G/N, Tandem)         │   │
-│  │  ├─ /api/analytical (Erlang-C, M/G/N formulas)      │   │
-│  │  ├─ /api/distributed (Raft, Vector Clocks, 2PC)    │   │
-│  │  └─ /api/results (Export, Compare, Filter)          │   │
+│  │  ├─ /api/analytical (Formulas & Comparisons)        │   │
+│  │  └─ /api/results (Export, Filter)                   │   │
 │  │                                                       │   │
 │  │ Integration:                                         │   │
 │  │  └─ src/ (Main simulation code)                      │   │
 │  │     ├─ models/ (Queue simulations)                   │   │
 │  │     └─ analysis/ (Analytical formulas)               │   │
-│  └──────────────────────────────────────────────────────┘   │
 └─────────────────────────────────────────────────────────────┘
 ```
 
@@ -51,26 +50,22 @@
 ```
 frontend/src/
 ├── main.tsx                    # React DOM render
-├── App.tsx                     # Main app layout
-├── index.css                   # Global styles
+├── App.tsx                     # Main app layout & routing
+├── index.css                   # Global styles (Tailwind)
 ├── components/
-│   ├── Dashboard.tsx           # [TO BUILD] Summary page
-│   ├── SimulationForm.tsx      # [TO BUILD] Config forms
-│   ├── LiveMonitor.tsx         # [TO BUILD] Progress display
-│   ├── ResultsChart.tsx        # [TO BUILD] Visualizations
-│   └── ApiTest.tsx             # Demo component (working)
+│   ├── AppLayout.tsx           # Sidebar navigation
+│   ├── ui/                     # Shadcn UI components (Card, Button, Slider...)
+│   └── LatencyChart.tsx        # Reusable chart component
 ├── services/
-│   ├── api.ts                  # HTTP client (429 lines, ready)
-│   └── websocket.ts            # WebSocket client (ready)
-├── types/
-│   └── models.ts               # TypeScript types (231 lines, ready)
-├── utils/
-│   └── theme.ts                # Material-UI theme
-└── pages/                      # [TO CREATE] React Router pages
-    ├── DashboardPage.tsx
-    ├── SimulatePage.tsx
-    ├── ResultsPage.tsx
-    └── DistributedPage.tsx
+│   └── BackendService.ts       # API Client (Port 3100)
+├── context/
+│   └── SimulationContext.tsx   # Global simulation state
+├── pages/
+│   ├── Dashboard.tsx           # Project Overview
+│   ├── ControlCenter.tsx       # Main Demo Page ("The Storyteller")
+│   ├── MMNCalculator.tsx       # "Capacity Planner"
+│   ├── TandemQueue.tsx         # "The Blast Radius"
+│   └── MGNvsMMNComparison.tsx  # "The Reality Gap Explorer"
 ```
 
 ### Backend Routes
@@ -79,16 +74,14 @@ frontend/src/
 backend/api/
 ├── main.py                     # FastAPI initialization
 ├── routes/
-│   ├── simulations.py          # M/M/N, M/G/N, Tandem endpoints
-│   ├── analytical.py           # Erlang-C, M/G/N, Tandem formulas
-│   ├── distributed.py          # Raft, Vector Clocks, 2PC
-│   └── results.py              # Export, compare, filter
+│   ├── simulations.py          # Simulation endpoints
+│   ├── analytical.py           # Analytical formulas
+│   └── results.py              # Results management
 ├── models/
-│   ├── simulation_models.py    # Request/response Pydantic models
-│   ├── analytical_models.py    # Analytical Pydantic models
-│   └── distributed_models.py   # Distributed systems models
+│   ├── simulation_models.py    # Pydantic models
+│   └── analytical_models.py    # Analytical models
 └── services/
-    └── simulation_service.py   # Business logic & storage
+    └── simulation_service.py   # Business logic
 ```
 
 ---
@@ -102,21 +95,12 @@ backend/api/
 | `/api/health` | GET | Health check |
 | `/api/simulations/mmn` | POST | Run M/M/N simulation |
 | `/api/simulations/mgn` | POST | Run M/G/N (heavy-tailed) |
+| `/api/simulations/heterogeneous` | POST | Run Legacy/Heterogeneous sim |
 | `/api/simulations/tandem` | POST | Run tandem queue |
-| `/api/simulations/{id}/status` | GET | Get simulation progress |
 | `/api/simulations/{id}/results` | GET | Get completed results |
-| `/api/simulations/ws/{id}` | WS | Real-time updates |
-| `/api/analytical/mmn` | POST | Calculate M/M/N instantly |
-| `/api/analytical/mgn` | POST | Calculate M/G/N instantly |
-| `/api/analytical/tandem` | POST | Calculate tandem instantly |
-| `/api/analytical/formulas` | GET | Get 15 formulas (LaTeX) |
+| `/api/analytical/mmn` | POST | Calculate M/M/N metrics |
+| `/api/analytical/tandem` | POST | Calculate tandem metrics |
 | `/api/analytical/compare` | POST | Simulation vs analytical |
-| `/api/distributed/raft` | POST | Raft consensus |
-| `/api/distributed/vector-clocks` | POST | Vector clocks |
-| `/api/distributed/two-phase-commit` | POST | 2PC |
-| `/api/results/` | GET | List all results |
-| `/api/results/{id}` | GET | Get result details |
-| `/api/results/{id}/export` | GET | Export (json/csv) |
 | `/api/docs` | GET | Swagger UI documentation |
 
 ---
@@ -435,30 +419,29 @@ http://localhost:4000
 ## Important Port Numbers
 
 - **Frontend:** 4000 (Vite dev server)
-- **Backend:** 6000 (FastAPI)
-- **Docs:** 6000/api/docs (Swagger)
-- **Do NOT use:** 3000, 5000, 8000 (common conflicts)
+- **Backend:** 3100 (FastAPI)
+- **Docs:** 3100/api/docs (Swagger)
 
 ---
 
-## Next Component Priority
+## Tech Stack (Final)
 
-### Phase 1 (Essential)
-1. Dashboard layout
-2. M/M/N simulation form
-3. Simple results table
+### Frontend
+- **Framework**: React 18 + Vite
+- **Language**: TypeScript
+- **Styling**: Tailwind CSS
+- **Components**: Shadcn UI (Radix Primitives)
+- **Animations**: Framer Motion
+- **Icons**: Lucide React
+- **Charts**: Recharts
 
-### Phase 2 (Important)
-1. Recharts visualization
-2. WebSocket integration
-3. M/G/N and Tandem forms
-
-### Phase 3 (Nice to have)
-1. ECharts comparisons
-2. Distributed systems UI
-3. Export functionality
+### Backend
+- **Framework**: FastAPI
+- **Language**: Python 3.11+
+- **Simulation**: SimPy
+- **Validation**: Pydantic V2
 
 ---
 
-**Last Updated:** 2025-11-18  
-**Status:** Production-ready infrastructure, components TBD
+**Last Updated:** 2025-12-01
+**Status:** Final Production Release
