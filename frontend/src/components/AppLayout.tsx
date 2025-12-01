@@ -24,6 +24,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
 
     const navItems = [
         { path: '/', label: 'Dashboard', icon: LayoutDashboard },
+        { path: '/control', label: 'Control Center', icon: Activity },
         { path: '/mmn', label: 'M/M/N Calculator', icon: Calculator },
         { path: '/mgn', label: 'M/G/N Calculator', icon: Activity },
         { path: '/compare', label: 'Model Comparison', icon: GitCompare },

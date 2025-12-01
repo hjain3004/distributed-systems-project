@@ -19,7 +19,7 @@ sys.path.append('/home/user/distributed-systems-project')
 backend_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 sys.path.append(backend_dir)
 
-from src.core.config import MMNConfig, MGNConfig, TandemQueueConfig
+from src.core.config import MMNConfig, MGNConfig, TandemQueueConfig, HeterogeneousMMNConfig, ServerGroup
 from src.models.mmn_queue import run_mmn_simulation
 from src.models.mgn_queue import run_mgn_simulation
 from src.models.tandem_queue import run_tandem_simulation
@@ -28,6 +28,8 @@ from api.models.simulation_models import (
     MMNSimulationRequest,
     MGNSimulationRequest,
     TandemSimulationRequest,
+    HeterogeneousSimulationRequest,
+    DistributedSimulationRequest,
     SimulationResponse,
     SimulationStatus
 )
@@ -66,7 +68,8 @@ async def run_mmn(request: MMNSimulationRequest, background_tasks: BackgroundTas
             service_rate=request.service_rate,
             sim_duration=request.sim_duration,
             warmup_time=request.warmup_time,
-            random_seed=request.random_seed
+            random_seed=request.random_seed,
+            enable_qos=request.enable_qos
         )
 
         # Store simulation metadata
@@ -121,7 +124,9 @@ async def run_mgn(request: MGNSimulationRequest, background_tasks: BackgroundTas
             alpha=request.alpha,
             sim_duration=request.sim_duration,
             warmup_time=request.warmup_time,
-            random_seed=request.random_seed
+            random_seed=request.random_seed,
+            erlang_k=request.k,
+            enable_qos=request.enable_qos
         )
 
         simulation_service.create_simulation(
@@ -200,6 +205,85 @@ async def run_tandem(request: TandemSimulationRequest, background_tasks: Backgro
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/heterogeneous", response_model=SimulationResponse)
+async def run_heterogeneous(request: HeterogeneousSimulationRequest, background_tasks: BackgroundTasks):
+    """
+    Run Heterogeneous M/M/N simulation
+    """
+    try:
+        sim_id = str(uuid.uuid4())
+
+        config = HeterogeneousMMNConfig(
+            arrival_rate=request.arrival_rate,
+            server_groups=[ServerGroup(**g) for g in request.server_groups],
+            selection_policy=request.selection_policy,
+            sim_duration=request.sim_duration,
+            warmup_time=request.warmup_time,
+            random_seed=request.random_seed
+        )
+
+        simulation_service.create_simulation(
+            sim_id=sim_id,
+            model_type="Heterogeneous",
+            config=config.dict(),
+            status="running"
+        )
+
+        background_tasks.add_task(
+            simulation_service.run_heterogeneous_simulation,
+            sim_id,
+            config
+        )
+
+        return SimulationResponse(
+            simulation_id=sim_id,
+            status="running",
+            model_type="Heterogeneous",
+            message="Heterogeneous simulation started successfully",
+            created_at=datetime.utcnow()
+        )
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/distributed", response_model=SimulationResponse)
+async def run_distributed(request: DistributedSimulationRequest, background_tasks: BackgroundTasks):
+    """
+    Run Distributed Broker simulation (Consistency/Ordering)
+    """
+    try:
+        sim_id = str(uuid.uuid4())
+
+        # Config dict for now since we don't have a DistributedConfig class exposed yet
+        config = request.dict()
+
+        simulation_service.create_simulation(
+            sim_id=sim_id,
+            model_type="Distributed",
+            config=config,
+            status="running"
+        )
+
+        background_tasks.add_task(
+            simulation_service.run_distributed_simulation,
+            sim_id,
+            config
+        )
+
+        return SimulationResponse(
+            simulation_id=sim_id,
+            status="running",
+            model_type="Distributed",
+            message="Distributed simulation started successfully",
+            created_at=datetime.utcnow()
+        )
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
 
 
 @router.get("/{simulation_id}/status", response_model=SimulationStatus)

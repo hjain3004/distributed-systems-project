@@ -237,24 +237,52 @@ class DistributedBroker:
 
         self.total_messages_published += 1
 
-    def receive_message(self) -> Optional[CloudMessage]:
+    def receive_message(self, enable_hedging: bool = False) -> Optional[CloudMessage]:
         """
         Receive message from broker
-
-        Paper: "one of the nodes is randomly sampled"
-        Implements random node sampling for load balancing
+        
+        Args:
+            enable_hedging: If True, query 2 nodes and take first response (Google Strategy)
 
         Returns:
             CloudMessage if available, None otherwise
         """
-        # Random node sampling (models SQS/Azure Queue behavior)
-        sampled_node = random.choice(self.nodes)
+        if enable_hedging and self.num_nodes >= 2:
+            # THE CURE: Request Hedging
+            # "Send the same request to two different servers."
+            
+            # 1. Pick 2 random nodes
+            nodes = random.sample(self.nodes, 2)
+            
+            # 2. Query both (Simulated)
+            # In a real async system, we'd fire two futures.
+            # Here, we check both and see which one "would" be faster or has data.
+            # Simplified: Check both, if one has data, take it. 
+            # If both have data, we assume the one with SHORTER queue is faster?
+            # Or just take the first one that isn't empty.
+            
+            msg1 = nodes[0].receive_message()
+            if msg1:
+                self.total_messages_received += 1
+                return msg1
+                
+            # If first failed/empty, try second immediately
+            msg2 = nodes[1].receive_message()
+            if msg2:
+                self.total_messages_received += 1
+                return msg2
+                
+            return None
+            
+        else:
+            # Standard: Random node sampling (models SQS/Azure Queue behavior)
+            sampled_node = random.choice(self.nodes)
 
-        message = sampled_node.receive_message()
-        if message:
-            self.total_messages_received += 1
+            message = sampled_node.receive_message()
+            if message:
+                self.total_messages_received += 1
 
-        return message
+            return message
 
     def acknowledge_message(self, message: CloudMessage) -> bool:
         """
@@ -316,3 +344,78 @@ class DistributedBroker:
             'total_queue_depth': self.get_total_queue_depth(),
             'unique_message_count': self.get_unique_message_count(),
         }
+
+
+def run_distributed_simulation(config) -> Dict:
+    """
+    Run Distributed Broker Simulation
+    """
+    env = simpy.Environment()
+    
+    # Map config ordering mode to broker ordering mode
+    broker_ordering = "in_order" if config.ordering_mode in ["fifo", "strict_fifo", "causal"] else "out_of_order"
+    
+    # Create Broker
+    broker = DistributedBroker(
+        env, 
+        num_nodes=config.num_nodes,
+        replication_factor=config.replication_factor,
+        ordering_mode=broker_ordering
+    )
+    
+    # Metrics
+    latencies = []
+    
+    def message_generator(env, broker, arrival_rate):
+        """Generate messages"""
+        msg_id = 0
+        while True:
+            yield env.timeout(random.expovariate(arrival_rate))
+            msg_id += 1
+            msg = CloudMessage(
+                id=msg_id,
+                content=f"msg_{msg_id}",
+                arrival_time=env.now
+            )
+            broker.publish_message(msg)
+            
+    def message_consumer(env, broker, service_rate, enable_hedging):
+        """Consume messages"""
+        while True:
+            # Service time (processing overhead)
+            yield env.timeout(random.expovariate(service_rate))
+            
+            # Receive
+            msg = broker.receive_message(enable_hedging=enable_hedging)
+            
+            if msg:
+                # Calculate latency
+                latency = env.now - msg.arrival_time
+                latencies.append(latency)
+                
+                # Acknowledge
+                broker.acknowledge_message(msg)
+            else:
+                # Backoff if empty
+                yield env.timeout(0.01)
+
+    # Start processes
+    env.process(message_generator(env, broker, config.arrival_rate))
+    
+    # Start consumers (assume 1 consumer per node for simplicity, or just 1 global consumer)
+    # For distributed broker, usually we have multiple consumers.
+    # Let's spawn 5 consumers.
+    for _ in range(5):
+        env.process(message_consumer(env, broker, config.service_rate, config.enable_hedging))
+        
+    # Run simulation
+    env.run(until=config.sim_duration)
+    
+    # Calculate metrics
+    mean_latency = sum(latencies) / len(latencies) if latencies else 0.0
+    
+    return {
+        "mean_latency": mean_latency,
+        "total_messages": len(latencies),
+        "broker_metrics": broker.get_broker_metrics()
+    }

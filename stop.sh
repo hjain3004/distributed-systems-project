@@ -8,7 +8,10 @@ echo ""
 
 # Stop backend
 echo "Stopping backend..."
-pkill -f "python.*simple_main" && echo "✅ Backend stopped" || echo "⚠️  Backend was not running"
+pkill -f "python.*simple_main" && echo "✅ Simple backend stopped" || true
+pkill -f "uvicorn" && echo "✅ Uvicorn backend stopped" || true
+# Force kill anything on port 3100 just in case
+lsof -ti:3100 | xargs kill -9 2>/dev/null || true
 
 # Stop frontend
 echo "Stopping frontend..."

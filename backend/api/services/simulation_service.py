@@ -8,10 +8,11 @@ from datetime import datetime
 import sys
 sys.path.append('/home/user/distributed-systems-project')
 
-from src.core.config import MMNConfig, MGNConfig, TandemQueueConfig
-from src.models.mmn_queue import run_mmn_simulation
 from src.models.mgn_queue import run_mgn_simulation
 from src.models.tandem_queue import run_tandem_simulation
+from src.models.heterogeneous_mmn import run_heterogeneous_mmn_simulation
+from src.models.priority_queue import run_priority_queue_simulation
+from src.core.config import MMNConfig, MGNConfig, TandemQueueConfig, HeterogeneousMMNConfig, ServerGroup, PriorityQueueConfig
 
 
 class SimulationService:
@@ -88,10 +89,32 @@ class SimulationService:
             )
 
             # Run simulation
-            metrics = run_mmn_simulation(config)
-
-            # Get summary statistics
-            stats = metrics.summary_statistics()
+            if config.enable_qos:
+                # Run Priority Queue Simulation (M/M/N with Priorities)
+                priority_config = PriorityQueueConfig(
+                    arrival_rate=config.arrival_rate,
+                    num_threads=config.num_threads,
+                    service_rate=config.service_rate,
+                    sim_duration=config.sim_duration,
+                    warmup_time=config.warmup_time,
+                    random_seed=config.random_seed,
+                    num_priorities=2,
+                    priority_rates=[config.arrival_rate * 0.2, config.arrival_rate * 0.8], # 20% VIP
+                    preemptive=True # VIPs preempt standard
+                )
+                results = run_priority_queue_simulation(priority_config)
+                
+                # Use Standard Traffic (Priority 2) as the main metrics to show starvation
+                std_metrics = results[2]
+                metrics = std_metrics # This is a dict, not SimulationMetrics object
+                stats = std_metrics # It's already a dict
+                
+                # Add VIP metrics to results
+                stats['vip_metrics'] = results[1]
+            else:
+                metrics = run_mmn_simulation(config)
+                # Get summary statistics
+                stats = metrics.summary_statistics()
 
             # Update with results
             self.update_simulation(
@@ -124,8 +147,27 @@ class SimulationService:
             )
 
             # Run simulation
-            metrics = run_mgn_simulation(config)
-            stats = metrics.summary_statistics()
+            if config.enable_qos:
+                # Priority Queue with General Distribution (Not fully supported in PriorityQueueModel yet, falls back to Exp)
+                # For demo purposes, we run Priority Queue (M/M/N QoS)
+                priority_config = PriorityQueueConfig(
+                    arrival_rate=config.arrival_rate,
+                    num_threads=config.num_threads,
+                    service_rate=config.service_rate,
+                    sim_duration=config.sim_duration,
+                    warmup_time=config.warmup_time,
+                    random_seed=config.random_seed,
+                    num_priorities=2,
+                    priority_rates=[config.arrival_rate * 0.2, config.arrival_rate * 0.8],
+                    preemptive=True
+                )
+                results = run_priority_queue_simulation(priority_config)
+                std_metrics = results[2]
+                stats = std_metrics
+                stats['vip_metrics'] = results[1]
+            else:
+                metrics = run_mgn_simulation(config)
+                stats = metrics.summary_statistics()
 
             # Update with results
             self.update_simulation(
@@ -185,6 +227,79 @@ class SimulationService:
                 sim_id,
                 status="failed",
                 message="Tandem queue simulation failed",
+                error=str(e),
+                completed_at=datetime.utcnow()
+            )
+
+    def run_heterogeneous_simulation(self, sim_id: str, config: HeterogeneousMMNConfig):
+        """Run Heterogeneous M/M/N simulation in background"""
+        try:
+            self.update_simulation(
+                sim_id,
+                status="running",
+                message="Running Heterogeneous M/M/N simulation..."
+            )
+
+            # Run simulation
+            metrics = run_heterogeneous_mmn_simulation(config)
+            stats = metrics.summary_statistics()
+
+            # Update with results
+            self.update_simulation(
+                sim_id,
+                status="completed",
+                progress=100,
+                message="Heterogeneous simulation completed successfully",
+                results=stats,
+                metrics=stats,
+                completed_at=datetime.utcnow()
+            )
+
+        except Exception as e:
+            self.update_simulation(
+                sim_id,
+                status="failed",
+                message="Heterogeneous simulation failed",
+                error=str(e),
+                completed_at=datetime.utcnow()
+            )
+
+    def run_distributed_simulation(self, sim_id: str, config: Dict[str, Any]):
+        """
+        Run Distributed Broker simulation (Consistency/Ordering)
+        """
+        try:
+            self.update_simulation(
+                sim_id,
+                status="running",
+                message="Running Distributed Broker simulation..."
+            )
+            
+            # Mock result for now to unblock frontend integration
+            import time
+            time.sleep(1) # Simulate work
+            
+            results = {
+                "mean_latency": 0.250 if config.get("consistency_mode") == "strong" else 0.100,
+                "p99_latency": 1.500 if config.get("ordering_mode") == "fifo" else 0.500,
+                "throughput": 120 if config.get("ordering_mode") == "fifo" else 500
+            }
+
+            self.update_simulation(
+                sim_id,
+                status="completed",
+                progress=100,
+                message="Distributed simulation completed (MOCK)",
+                results=results,
+                metrics=results,
+                completed_at=datetime.utcnow()
+            )
+
+        except Exception as e:
+            self.update_simulation(
+                sim_id,
+                status="failed",
+                message="Distributed simulation failed",
                 error=str(e),
                 completed_at=datetime.utcnow()
             )

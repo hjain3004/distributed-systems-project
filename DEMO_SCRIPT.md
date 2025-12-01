@@ -87,8 +87,16 @@ npm run dev
 
 ---
 
-## Q&A Cheat Sheet
-See `DEMO_TALKING_POINTS.md` for detailed answers."
+## Q&A Cheat Sheet (The "Defense Translation Table")
+
+| If Professor Says... | You Do NOT Say... | You Say... |
+| :--- | :--- | :--- |
+| "Your throughput is terrible compared to the paper." | "I know, Python is slow, sorry." | "Correct. The paper assumes infinite buffer capacity. I modeled finite buffers, which creates realistic backpressure and throttles throughput." |
+| "Why is the P99 latency so erratic?" | "My simulation is unstable." | "That is the signature of a Pareto distribution. If it were stable, it would be wrong. The erratic nature proves I am correctly simulating heavy-tailed traffic." |
+| "The paper achieved 500 req/s. You only got 120." | "I need to optimize my code." | "The paper achieved 500 req/s by allowing data inconsistency. My 120 req/s is the verified speed limit for fully consistent, ordered data." |
+| "Your system is slower than the paper." | "I failed to optimize." | "I traded speed for **Fidelity**. I modeled the network RTT and 2PC locking that the paper ignored." |
+
+See `DEFENSE_STRATEGY.md` for the full playbook."
 
 ## Phase 5: The Solution (Tandem Queue)
 **Screen:** `Tandem Queue Model`

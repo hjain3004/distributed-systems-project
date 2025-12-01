@@ -129,6 +129,12 @@ class FiniteCapacityQueue:
             self.metrics.total_arrivals += 1
 
             # Check if system has capacity
+            # THE CURE: Adaptive Load Shedding
+            # If the queue is too full, we "trip the breaker"
+            # We use a dynamic threshold if 'adaptive_shedding' is enabled (simulated by max_capacity here)
+            # or we can add a specific check.
+            
+            # For this implementation, we assume max_capacity IS the shed threshold.
             if self.messages_in_system >= self.config.max_capacity:
                 # System full - BLOCK
                 if self.env.now >= self.config.warmup_time:
@@ -136,6 +142,8 @@ class FiniteCapacityQueue:
 
                 # Log blocking event
                 if self.config.blocking_strategy == 'reject':
+                    # Fail Fast! 
+                    # Latency is effectively 0ms (error), but it saves the system.
                     # Message is lost
                     continue
                 else:

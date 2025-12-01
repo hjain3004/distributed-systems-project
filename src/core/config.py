@@ -77,6 +77,7 @@ class QueueConfig(BaseModel):
 class MMNConfig(QueueConfig):
     """M/M/N specific configuration"""
     model_type: Literal["M/M/N"] = "M/M/N"
+    enable_qos: bool = Field(default=False, description="Enable Priority QoS")
 
 
 class MGNConfig(QueueConfig):
@@ -88,7 +89,7 @@ class MGNConfig(QueueConfig):
     """
     model_type: Literal["M/G/N"] = "M/G/N"
 
-    distribution: Literal["pareto", "lognormal", "weibull"] = Field(
+    distribution: Literal["pareto", "lognormal", "weibull", "erlang", "exponential"] = Field(
         default="pareto",
         description="Service time distribution"
     )
@@ -100,6 +101,15 @@ class MGNConfig(QueueConfig):
         le=5.0,
         description="Pareto shape parameter"
     )
+    
+    # Erlang parameters
+    erlang_k: int = Field(
+        default=2,
+        gt=0,
+        le=20,
+        description="Erlang shape parameter (k)"
+    )
+    enable_qos: bool = Field(default=False, description="Enable Priority QoS")
 
     @property
     def scale(self) -> float:
@@ -350,9 +360,15 @@ class HeterogeneousMMNConfig(BaseModel):
     )
 
     # Server selection policy
-    selection_policy: Literal["random", "fastest_first", "round_robin", "shortest_queue"] = Field(
+    selection_policy: Literal["random", "fastest_first", "round_robin", "shortest_queue", "work_stealing"] = Field(
         default="random",
         description="Policy for selecting which server group to use"
+    )
+
+    # Consistency Mode (for 2PC overhead)
+    consistency_mode: Literal["eventual", "strong", "strong_2pc", "raft"] = Field(
+        default="eventual",
+        description="Consistency mode (affects service time)"
     )
 
     # Simulation parameters
@@ -602,3 +618,23 @@ class TandemQueueConfig(BaseModel):
         - p·D_link: Average retries (p failures × D_link per retry)
         """
         return (2 + self.failure_prob) * self.network_delay
+
+
+class DistributedConfig(BaseModel):
+    """
+    Distributed Broker Configuration
+    """
+    model_type: Literal["Distributed"] = "Distributed"
+    
+    arrival_rate: float = Field(gt=0)
+    service_rate: float = Field(gt=0)
+    num_nodes: int = Field(default=3, gt=0)
+    replication_factor: int = Field(default=3, gt=0)
+    consistency_mode: Literal["eventual", "strong", "strong_2pc", "raft"] = "eventual"
+    ordering_mode: Literal["unordered", "fifo", "strict_fifo", "causal"] = "unordered"
+    enable_hedging: bool = False
+    
+    sim_duration: float = Field(default=1000.0, gt=0)
+    warmup_time: float = Field(default=100.0, ge=0)
+    random_seed: Optional[int] = None
+

@@ -9,12 +9,15 @@ echo ""
 # Kill any existing processes on these ports
 echo "Cleaning up old processes..."
 pkill -f "python.*simple_main" 2>/dev/null || true
+pkill -f "uvicorn" 2>/dev/null || true
 pkill -f "vite" 2>/dev/null || true
 sleep 1
 
 # Start backend
 echo "Starting backend on port 3100..."
-nohup python3 backend/simple_main.py > /tmp/backend.log 2>&1 &
+echo "Starting backend on port 3100..."
+export PYTHONPATH=$PYTHONPATH:$(pwd)
+nohup python3 -m uvicorn backend.api.main:app --host 0.0.0.0 --port 3100 > /tmp/backend.log 2>&1 &
 BACKEND_PID=$!
 sleep 2
 

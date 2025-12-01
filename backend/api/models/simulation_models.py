@@ -16,6 +16,7 @@ class MMNSimulationRequest(BaseModel):
     sim_duration: float = Field(default=1000.0, gt=0, description="Simulation duration (seconds)")
     warmup_time: float = Field(default=100.0, ge=0, description="Warmup period to discard (seconds)")
     random_seed: Optional[int] = Field(default=42, description="Random seed for reproducibility")
+    enable_qos: bool = Field(default=False, description="Enable Priority QoS (VIP vs Standard)")
 
     @validator('arrival_rate')
     def validate_stability(cls, v, values):
@@ -46,13 +47,15 @@ class MGNSimulationRequest(BaseModel):
     service_rate: float = Field(..., gt=0, description="Mean service rate μ (messages/sec/thread)")
     distribution: str = Field(default="pareto", description="Service time distribution (pareto, lognormal, exponential)")
     alpha: float = Field(default=2.5, gt=1.0, description="Pareto shape parameter (α > 1 for finite mean)")
+    k: Optional[int] = Field(default=1, ge=1, description="Erlang shape parameter k")
     sim_duration: float = Field(default=1000.0, gt=0, description="Simulation duration (seconds)")
     warmup_time: float = Field(default=100.0, ge=0, description="Warmup period to discard (seconds)")
     random_seed: Optional[int] = Field(default=42, description="Random seed")
+    enable_qos: bool = Field(default=False, description="Enable Priority QoS")
 
     @validator('distribution')
     def validate_distribution(cls, v):
-        allowed = ["pareto", "lognormal", "exponential"]
+        allowed = ["pareto", "lognormal", "exponential", "erlang_k2", "erlang_k5"]
         if v not in allowed:
             raise ValueError(f"Distribution must be one of: {allowed}")
         return v
@@ -128,7 +131,59 @@ class TandemSimulationRequest(BaseModel):
         }
 
 
-class SimulationResponse(BaseModel):
+class HeterogeneousSimulationRequest(BaseModel):
+    """Heterogeneous Server Simulation Request"""
+    arrival_rate: float = Field(..., gt=0, description="Arrival rate λ (messages/sec)")
+    server_groups: list[dict] = Field(..., description="List of server groups [{'count': 2, 'service_rate': 8.0, 'name': 'slow'}]")
+    selection_policy: str = Field(default="random", description="Server selection policy (random, fastest_first, etc.)")
+    sim_duration: float = Field(default=1000.0, gt=0, description="Simulation duration (seconds)")
+    warmup_time: float = Field(default=100.0, ge=0, description="Warmup period (seconds)")
+    random_seed: Optional[int] = Field(default=42, description="Random seed")
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "arrival_rate": 50.0,
+                "server_groups": [
+                    {"count": 2, "service_rate": 8.0, "name": "slow"},
+                    {"count": 3, "service_rate": 15.0, "name": "fast"}
+                ],
+                "selection_policy": "random",
+                "sim_duration": 1000.0,
+                "warmup_time": 100.0,
+                "random_seed": 42
+            }
+        }
+
+
+class DistributedSimulationRequest(BaseModel):
+    """Distributed Broker Simulation Request (Consistency/Ordering)"""
+    arrival_rate: float = Field(..., gt=0, description="Arrival rate λ")
+    service_rate: float = Field(..., gt=0, description="Service rate μ")
+    num_nodes: int = Field(default=3, gt=0, description="Number of storage nodes")
+    consistency_mode: str = Field(default="eventual", description="Consistency mode (eventual, strong)")
+    ordering_mode: str = Field(default="unordered", description="Ordering mode (unordered, fifo)")
+    failure_prob: float = Field(default=0.0, ge=0.0, le=1.0, description="Node failure probability")
+    enable_hedging: bool = Field(default=False, description="Enable Request Hedging")
+    sim_duration: float = Field(default=1000.0, gt=0, description="Simulation duration")
+    warmup_time: float = Field(default=100.0, ge=0, description="Warmup period")
+    random_seed: Optional[int] = Field(default=42, description="Random seed")
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "arrival_rate": 50.0,
+                "service_rate": 100.0,
+                "num_nodes": 3,
+                "consistency_mode": "strong",
+                "ordering_mode": "fifo",
+                "failure_prob": 0.01,
+                "sim_duration": 1000.0,
+                "warmup_time": 100.0,
+                "random_seed": 42
+            }
+        }
+
     """Generic Simulation Response"""
     simulation_id: str
     status: str  # running, completed, failed

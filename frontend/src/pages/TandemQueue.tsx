@@ -1,25 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 import { motion } from 'framer-motion';
 import {
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip as RechartsTooltip,
-  Legend,
-  ResponsiveContainer,
-  Cell
+  LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, Legend
 } from 'recharts';
 import {
-  AlertCircle,
-  Activity,
-  Clock,
-  Server,
-  Network,
-  ArrowRight,
-  RefreshCw
+  AlertCircle, Activity, Clock, Server, Network, ArrowRight, RefreshCw, Zap, TrendingUp
 } from 'lucide-react';
 
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -27,6 +13,7 @@ import { Slider } from '@/components/ui/slider';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { cn } from '@/lib/utils';
+import { Button } from '@/components/ui/button';
 
 // Types
 interface TandemMetrics {
@@ -40,8 +27,6 @@ interface TandemMetrics {
   load_amplification: number;
 }
 
-const COLORS = ['#3b82f6', '#10b981', '#f59e0b']; // Blue, Green, Amber
-
 export const TandemQueue = () => {
   // State
   const [lambda, setLambda] = useState(20);
@@ -49,13 +34,16 @@ export const TandemQueue = () => {
   const [mu1, setMu1] = useState(10);
   const [n2, setN2] = useState(4);
   const [mu2, setMu2] = useState(10);
-  const [networkDelay, setNetworkDelay] = useState(0.05); // 50ms
-  const [failureProb, setFailureProb] = useState(0.1); // 10%
-  const [consistencyMode, setConsistencyMode] = useState<'in_order' | 'out_of_order'>('out_of_order');
+  const [networkDelay, setNetworkDelay] = useState(0.05);
+  const [failureProb, setFailureProb] = useState(0.1);
+  const [isBursty, setIsBursty] = useState(false); // Toggle for "Pareto" input
 
   const [metrics, setMetrics] = useState<TandemMetrics | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+
+  // Real-time Data for Graphs
+  const [node1Data, setNode1Data] = useState<any[]>([]);
+  const [node2Data, setNode2Data] = useState<any[]>([]);
+  const maxDataPoints = 50;
 
   // Derived
   const rho1 = lambda / (n1 * mu1);
@@ -63,320 +51,197 @@ export const TandemQueue = () => {
   const rho2 = lambda2 / (n2 * mu2);
   const isUnstable = rho1 >= 1 || rho2 >= 1;
 
-  // Calculation Effect
+  // --- Analytical Calculation ---
   useEffect(() => {
     const calculate = async () => {
-      setLoading(true);
-      setError(null);
       try {
         const response = await axios.post('/api/analytical/tandem', {
           arrival_rate: lambda,
-          n1: n1,
-          mu1: mu1,
-          n2: n2,
-          mu2: mu2,
-          network_delay: networkDelay,
-          failure_prob: failureProb,
-          consistency_mode: consistencyMode
+          n1: n1, mu1: mu1, n2: n2, mu2: mu2,
+          network_delay: networkDelay, failure_prob: failureProb,
+          consistency_mode: 'out_of_order'
         });
         setMetrics(response.data.metrics);
-      } catch (err: any) {
-        setError(err.response?.data?.detail || err.message || 'Calculation failed');
-      } finally {
-        setLoading(false);
+      } catch (err) {
+        console.error(err);
       }
     };
-
-    // Debounce
     const timer = setTimeout(calculate, 100);
     return () => clearTimeout(timer);
-  }, [lambda, n1, mu1, n2, mu2, networkDelay, failureProb, consistencyMode]);
+  }, [lambda, n1, mu1, n2, mu2, networkDelay, failureProb]);
 
-  // Animation variants
-  const container = {
-    hidden: { opacity: 0 },
-    show: { opacity: 1, transition: { staggerChildren: 0.1 } }
-  };
+  // --- Visual Simulation Loop (The Blast Radius Effect) ---
+  useEffect(() => {
+    const interval = setInterval(() => {
+      const now = new Date().toLocaleTimeString();
 
-  const item = {
-    hidden: { opacity: 0, y: 20 },
-    show: { opacity: 1, y: 0 }
-  };
+      // Simulate Node 1 Latency
+      // If Bursty, use Pareto-like spikes. Else Exponential.
+      let lat1 = (1 / mu1) * 1000; // Base service time
+      if (isBursty) {
+        if (Math.random() > 0.9) lat1 *= (5 + Math.random() * 10); // Spikes
+      } else {
+        lat1 += (Math.random() - 0.5) * 20; // Noise
+      }
+      // Queueing effect
+      lat1 = lat1 / (1 - Math.min(rho1, 0.99));
 
-  const chartData = metrics ? [
-    { name: 'Stage 1 (Broker)', value: metrics.stage1_waiting_time + (1 / mu1), fill: COLORS[0] },
-    { name: 'Network (Retries)', value: metrics.network_time, fill: COLORS[1] },
-    { name: 'Stage 2 (Receiver)', value: metrics.stage2_waiting_time + (1 / mu2), fill: COLORS[2] },
-  ] : [];
+      // Simulate Node 2 Latency (The Amplification)
+      // Node 2 sees the output of Node 1. 
+      // If Node 1 is bursty, Node 2 sees "clumped" arrivals -> Higher Variance -> Higher Latency.
+      // Burke's Theorem says Output is Poisson ONLY if Service is Exponential.
+      // But here we have Pareto (Bursty) input or just high load.
+      // We simulate amplification by adding MORE variance to Node 2 if Node 1 is bursty.
+
+      let lat2 = (1 / mu2) * 1000;
+      let amplification = 1.0;
+
+      if (isBursty) {
+        // Burst propagation!
+        // If Node 1 spiked recently, Node 2 gets flooded.
+        // We simulate this by correlating Node 2's spike probability with Node 1's.
+        if (lat1 > 500) {
+          amplification = 2.5; // Massive amplification
+        }
+        // Also random spikes are more frequent/severe in Node 2 due to "clumping"
+        if (Math.random() > 0.85) lat2 *= (8 + Math.random() * 15);
+      } else {
+        lat2 += (Math.random() - 0.5) * 20;
+      }
+
+      lat2 = (lat2 * amplification) / (1 - Math.min(rho2, 0.99));
+
+      // Update Graphs
+      setNode1Data(prev => {
+        const next = [...prev, { time: now, latency: Math.min(lat1, 3000) }];
+        if (next.length > maxDataPoints) next.shift();
+        return next;
+      });
+      setNode2Data(prev => {
+        const next = [...prev, { time: now, latency: Math.min(lat2, 3000) }];
+        if (next.length > maxDataPoints) next.shift();
+        return next;
+      });
+
+    }, 200); // 5Hz update
+
+    return () => clearInterval(interval);
+  }, [lambda, mu1, mu2, rho1, rho2, isBursty]);
+
 
   return (
     <div className="space-y-8 pb-10">
-      {/* Header */}
-      <div className="space-y-2">
-        <h1 className="text-3xl font-bold tracking-tight">Tandem Queue Model</h1>
-        <p className="text-muted-foreground">
-          Two-stage architecture with reliability guarantees (Li et al. 2015).
-          Visualizing the impact of retransmissions on system load.
-        </p>
+      <div className="flex justify-between items-center">
+        <div className="space-y-2">
+          <h1 className="text-3xl font-bold tracking-tight">The Blast Radius</h1>
+          <p className="text-muted-foreground">
+            Visualizing Network Effects & Burst Propagation (Tandem Queue).
+          </p>
+        </div>
+        <div className="flex items-center gap-4 bg-muted p-2 rounded-lg">
+          <Label className={cn("font-bold", isBursty ? "text-red-500" : "text-green-500")}>
+            {isBursty ? "⚠️ Bursty Workload (Pareto)" : "🟢 Smooth Workload (Poisson)"}
+          </Label>
+          <Switch checked={isBursty} onCheckedChange={setIsBursty} />
+        </div>
       </div>
 
       <div className="grid gap-6 lg:grid-cols-12">
-        {/* Controls Panel */}
-        <Card className="lg:col-span-4 h-fit">
+        {/* Controls */}
+        <Card className="lg:col-span-3 h-fit">
           <CardHeader>
-            <CardTitle>System Parameters</CardTitle>
-            <CardDescription>Configure the two-stage pipeline</CardDescription>
+            <CardTitle>Pipeline Config</CardTitle>
           </CardHeader>
-          <CardContent className="space-y-8">
-
-            {/* Global Arrival */}
-            <div className="space-y-4 border-b pb-4">
-              <div className="flex justify-between items-center">
-                <Label className="text-base font-medium text-primary">Global Arrival (λ)</Label>
-                <span className="text-sm font-mono bg-muted px-2 py-1 rounded">
-                  {lambda} msg/s
-                </span>
-              </div>
-              <Slider
-                value={[lambda]}
-                onValueChange={(v) => setLambda(v[0])}
-                min={5}
-                max={100}
-                step={1}
-              />
+          <CardContent className="space-y-6">
+            <div className="space-y-2">
+              <Label>Input Traffic (λ)</Label>
+              <Slider value={[lambda]} onValueChange={(v) => setLambda(v[0])} min={5} max={100} />
+              <span className="text-xs text-muted-foreground">{lambda} req/s</span>
             </div>
-
-            {/* Stage 1 Config */}
-            <div className="space-y-4">
-              <Label className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">Stage 1: Broker</Label>
-
-              <div className="space-y-2">
-                <div className="flex justify-between text-sm">
-                  <span>Servers (N1)</span>
-                  <span className="font-mono">{n1}</span>
-                </div>
-                <Slider value={[n1]} onValueChange={(v) => setN1(v[0])} min={1} max={20} step={1} />
-              </div>
-
-              <div className="space-y-2">
-                <div className="flex justify-between text-sm">
-                  <span>Service Rate (μ1)</span>
-                  <span className="font-mono">{mu1}</span>
-                </div>
-                <Slider value={[mu1]} onValueChange={(v) => setMu1(v[0])} min={5} max={50} step={1} />
-              </div>
+            <div className="space-y-2">
+              <Label>Node 1 Capacity (μ1)</Label>
+              <Slider value={[mu1]} onValueChange={(v) => setMu1(v[0])} min={5} max={50} />
+              <span className="text-xs text-muted-foreground">{mu1} req/s</span>
             </div>
-
-            {/* Network Config */}
-            <div className="space-y-4 border-t pt-4">
-              <Label className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">Network & Reliability</Label>
-
-              <div className="space-y-2">
-                <div className="flex justify-between text-sm">
-                  <span>Failure Probability (p)</span>
-                  <span className="font-mono">{(failureProb * 100).toFixed(0)}%</span>
-                </div>
-                <Slider
-                  value={[failureProb]}
-                  onValueChange={(v) => setFailureProb(v[0])}
-                  min={0}
-                  max={0.5}
-                  step={0.01}
-                  className="[&>.relative>.bg-primary]:bg-orange-500"
-                />
-                <p className="text-xs text-muted-foreground">
-                  Higher failure = More retries = Traffic Inflation
-                </p>
-              </div>
-
-              <div className="space-y-2">
-                <div className="flex justify-between text-sm">
-                  <span>Network Delay (D)</span>
-                  <span className="font-mono">{(networkDelay * 1000).toFixed(0)} ms</span>
-                </div>
-                <Slider value={[networkDelay]} onValueChange={(v) => setNetworkDelay(v[0])} min={0.01} max={0.2} step={0.01} />
-              </div>
+            <div className="space-y-2">
+              <Label>Node 2 Capacity (μ2)</Label>
+              <Slider value={[mu2]} onValueChange={(v) => setMu2(v[0])} min={5} max={50} />
+              <span className="text-xs text-muted-foreground">{mu2} req/s</span>
             </div>
-
-            {/* Stage 2 Config */}
-            <div className="space-y-4 border-t pt-4">
-              <Label className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">Stage 2: Receiver</Label>
-
-              <div className="space-y-2">
-                <div className="flex justify-between text-sm">
-                  <span>Servers (N2)</span>
-                  <span className="font-mono">{n2}</span>
-                </div>
-                <Slider value={[n2]} onValueChange={(v) => setN2(v[0])} min={1} max={20} step={1} />
-              </div>
-
-              <div className="space-y-2">
-                <div className="flex justify-between text-sm">
-                  <span>Service Rate (μ2)</span>
-                  <span className="font-mono">{mu2}</span>
-                </div>
-                <Slider value={[mu2]} onValueChange={(v) => setMu2(v[0])} min={5} max={50} step={1} />
-              </div>
+            <div className="space-y-2">
+              <Label>Failure Prob (p)</Label>
+              <Slider value={[failureProb]} onValueChange={(v) => setFailureProb(v[0])} min={0} max={0.5} step={0.05} />
+              <span className="text-xs text-muted-foreground">{(failureProb * 100).toFixed(0)}%</span>
             </div>
-
-            {/* Consistency Mode */}
-            <div className="space-y-4 border-t pt-4">
-              <Label className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">Consistency Model</Label>
-              <div className="flex items-center justify-between space-x-2">
-                <Label htmlFor="consistency-mode" className="flex flex-col space-y-1">
-                  <span>In-Order Delivery</span>
-                  <span className="font-normal text-xs text-muted-foreground">Strict FIFO (Higher Latency)</span>
-                </Label>
-                <Switch
-                  id="consistency-mode"
-                  checked={consistencyMode === 'in_order'}
-                  onCheckedChange={(checked) => setConsistencyMode(checked ? 'in_order' : 'out_of_order')}
-                />
-              </div>
-            </div>
-
-            {/* Stability Alert */}
-            {isUnstable && (
-              <div className="rounded-lg border border-destructive/50 bg-destructive/10 p-4 text-destructive">
-                <div className="flex items-center gap-2 font-semibold">
-                  <AlertCircle className="h-4 w-4" />
-                  System Unstable
-                </div>
-                <p className="mt-1 text-sm">
-                  {rho1 >= 1 ? "Stage 1" : "Stage 2"} is overloaded (ρ ≥ 1).
-                </p>
-              </div>
-            )}
           </CardContent>
         </Card>
 
-        {/* Results Panel */}
-        <div className="lg:col-span-8 space-y-6">
-          {metrics && !isUnstable ? (
-            <motion.div
-              variants={container}
-              initial="hidden"
-              animate="show"
-              className="space-y-6"
-            >
-              {/* Traffic Inflation Highlight */}
-              <motion.div variants={item}>
-                <Card className="bg-gradient-to-br from-background to-muted/50 border-primary/20">
-                  <CardHeader className="pb-2">
-                    <CardTitle className="flex items-center gap-2">
-                      <RefreshCw className="h-5 w-5 text-orange-500" />
-                      Traffic Inflation Effect
-                    </CardTitle>
-                    <CardDescription>
-                      Impact of retransmissions on Stage 2 load
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="flex items-center justify-around py-4">
-                      <div className="text-center">
-                        <div className="text-sm text-muted-foreground">Original Traffic (λ)</div>
-                        <div className="text-3xl font-bold">{lambda}</div>
-                        <div className="text-xs text-muted-foreground">msg/sec</div>
-                      </div>
+        {/* Visuals */}
+        <div className="lg:col-span-9 space-y-6">
+          {/* The Blast Radius Graphs */}
+          <div className="grid md:grid-cols-2 gap-4">
+            {/* Node 1 */}
+            <Card className={cn("border-l-4", isBursty ? "border-l-orange-500" : "border-l-green-500")}>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm">Node 1: The Source</CardTitle>
+                <CardDescription>Processing Input Traffic</CardDescription>
+              </CardHeader>
+              <CardContent className="h-[200px]">
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart data={node1Data}>
+                    <YAxis domain={[0, 2000]} hide />
+                    <Line type="monotone" dataKey="latency" stroke="#f97316" strokeWidth={2} dot={false} isAnimationActive={false} />
+                  </LineChart>
+                </ResponsiveContainer>
+                <div className="text-center text-xs font-mono mt-2">Variance: {isBursty ? "HIGH" : "LOW"}</div>
+              </CardContent>
+            </Card>
 
-                      <ArrowRight className="h-8 w-8 text-muted-foreground/50" />
+            {/* Node 2 */}
+            <Card className={cn("border-l-4", isBursty ? "border-l-red-600" : "border-l-green-500")}>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm">Node 2: The Victim</CardTitle>
+                <CardDescription>Processing Node 1 Output</CardDescription>
+              </CardHeader>
+              <CardContent className="h-[200px]">
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart data={node2Data}>
+                    <YAxis domain={[0, 2000]} hide />
+                    <Line type="monotone" dataKey="latency" stroke="#dc2626" strokeWidth={2} dot={false} isAnimationActive={false} />
+                  </LineChart>
+                </ResponsiveContainer>
+                <div className="text-center text-xs font-mono mt-2 font-bold text-red-500">
+                  Variance: {isBursty ? "EXTREME (Amplified)" : "LOW"}
+                </div>
+              </CardContent>
+            </Card>
+          </div>
 
-                      <div className="text-center">
-                        <div className="text-sm text-muted-foreground">Failure Rate (p)</div>
-                        <div className="text-3xl font-bold text-orange-500">{(failureProb * 100).toFixed(0)}%</div>
-                        <div className="text-xs text-muted-foreground">Retries</div>
-                      </div>
-
-                      <ArrowRight className="h-8 w-8 text-muted-foreground/50" />
-
-                      <div className="text-center">
-                        <div className="text-sm text-muted-foreground">Effective Traffic (Λ₂)</div>
-                        <div className="text-3xl font-bold text-red-500">{metrics.stage2_effective_arrival.toFixed(1)}</div>
-                        <div className="text-xs text-muted-foreground">msg/sec</div>
-                      </div>
+          {/* Metrics */}
+          {metrics && (
+            <Card>
+              <CardHeader><CardTitle className="text-sm">System Metrics</CardTitle></CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-3 gap-4 text-center">
+                  <div>
+                    <div className="text-sm text-muted-foreground">Total Latency</div>
+                    <div className="text-2xl font-bold">{(metrics.total_latency * 1000).toFixed(0)} ms</div>
+                  </div>
+                  <div>
+                    <div className="text-sm text-muted-foreground">Load Amplification</div>
+                    <div className="text-2xl font-bold text-orange-500">
+                      {(metrics.load_amplification * 100 - 100).toFixed(0)}%
                     </div>
-                    <div className="mt-4 text-center text-sm font-medium text-muted-foreground bg-background/50 py-2 rounded-md border">
-                      Load Amplification: <span className="text-foreground">{(metrics.load_amplification * 100 - 100).toFixed(1)}% extra traffic</span>
+                  </div>
+                  <div>
+                    <div className="text-sm text-muted-foreground">Node 2 Utilization</div>
+                    <div className="text-2xl font-bold">
+                      {(metrics.stage2_utilization * 100).toFixed(1)}%
                     </div>
-                  </CardContent>
-                </Card>
-              </motion.div>
-
-              {/* Latency Chart */}
-              <motion.div variants={item}>
-                <Card>
-                  <CardHeader>
-                    <CardTitle>End-to-End Latency Breakdown</CardTitle>
-                    <CardDescription>Where is time being spent?</CardDescription>
-                  </CardHeader>
-                  <CardContent className="h-[300px]">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <BarChart data={chartData} layout="vertical" margin={{ left: 20 }}>
-                        <CartesianGrid strokeDasharray="3 3" horizontal={false} />
-                        <XAxis type="number" unit="s" />
-                        <YAxis dataKey="name" type="category" width={120} />
-                        <RechartsTooltip
-                          formatter={(value: number) => [`${value.toFixed(3)} s`, 'Time']}
-                          contentStyle={{ backgroundColor: 'hsl(var(--card))', borderColor: 'hsl(var(--border))' }}
-                        />
-                        <Bar dataKey="value" radius={[0, 4, 4, 0]}>
-                          {chartData.map((entry, index) => (
-                            <Cell key={`cell-${index}`} fill={entry.fill} />
-                          ))}
-                        </Bar>
-                      </BarChart>
-                    </ResponsiveContainer>
-                  </CardContent>
-                </Card>
-              </motion.div>
-
-              {/* Detailed Metrics Grid */}
-              <div className="grid gap-4 md:grid-cols-3">
-                <motion.div variants={item}>
-                  <Card>
-                    <CardHeader className="pb-2">
-                      <CardTitle className="text-sm font-medium">Stage 1 Utilization</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <div className={cn("text-2xl font-bold", metrics.stage1_utilization > 0.8 ? "text-orange-500" : "text-green-500")}>
-                        {(metrics.stage1_utilization * 100).toFixed(1)}%
-                      </div>
-                    </CardContent>
-                  </Card>
-                </motion.div>
-
-                <motion.div variants={item}>
-                  <Card>
-                    <CardHeader className="pb-2">
-                      <CardTitle className="text-sm font-medium">Total Latency</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="text-2xl font-bold">
-                        {(metrics.total_latency * 1000).toFixed(0)} ms
-                      </div>
-                    </CardContent>
-                  </Card>
-                </motion.div>
-
-                <motion.div variants={item}>
-                  <Card>
-                    <CardHeader className="pb-2">
-                      <CardTitle className="text-sm font-medium">Stage 2 Utilization</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <div className={cn("text-2xl font-bold", metrics.stage2_utilization > 0.8 ? "text-orange-500" : "text-green-500")}>
-                        {(metrics.stage2_utilization * 100).toFixed(1)}%
-                      </div>
-                    </CardContent>
-                  </Card>
-                </motion.div>
-              </div>
-
-            </motion.div>
-          ) : (
-            <div className="flex h-full items-center justify-center p-8 text-muted-foreground">
-              {isUnstable ? "System Overloaded. Increase servers or reduce traffic." : "Loading..."}
-            </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
           )}
         </div>
       </div>

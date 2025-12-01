@@ -26,6 +26,7 @@ import simpy
 from typing import List, Optional
 from ..core.config import HeterogeneousMMNConfig, ServerGroup
 from ..core.metrics import SimulationMetrics
+from ..core.distributions import TwoPhaseCommitService, ExponentialService
 
 
 class ServerPool:
@@ -38,31 +39,124 @@ class ServerPool:
     - name for identification
     """
 
-    def __init__(self, env: simpy.Environment, group: ServerGroup):
+    def __init__(self, env: simpy.Environment, group: ServerGroup, pool_id: int, parent):
         self.env = env
+        self.group = group
+        self.pool_id = pool_id
+        self.parent = parent # Reference to main queue for stealing
         self.count = group.count
         self.service_rate = group.service_rate
         self.name = group.name or f"Group(μ={group.service_rate})"
+        
+        # 2PC Service Wrapper (if enabled)
+        self.twopc_service = None
+        if parent.config.consistency_mode == "strong_2pc":
+            base_dist = ExponentialService(rate=group.service_rate)
+            self.twopc_service = TwoPhaseCommitService(
+                base_distribution=base_dist,
+                num_replicas=3, # Default
+                network_rtt_mean=0.010 # 10ms
+            )
 
-        # SimPy resource pool
-        self.resource = simpy.Resource(env, capacity=group.count)
+        # Explicit Queue (Store)
+        self.queue = simpy.Store(env)
+        
+        # Track busy servers
+        self.busy_servers = 0
+        
+        # Start worker processes
+        self.workers = []
+        for i in range(self.count):
+            self.workers.append(env.process(self.worker_loop(i)))
 
         # Metrics
         self.messages_processed = 0
         self.total_service_time = 0.0
 
     def get_service_time(self) -> float:
-        """Sample exponential service time for this pool"""
+        """Sample service time for this pool"""
+        if self.twopc_service:
+            return self.twopc_service.sample()
         return np.random.exponential(1.0 / self.service_rate)
 
     def current_queue_length(self) -> int:
         """Current number of messages waiting in THIS pool's queue"""
-        return len(self.resource.queue)
+        return len(self.queue.items)
 
     def current_utilization(self) -> float:
-        """Current utilization of this pool (number busy / capacity)"""
-        num_busy = self.resource.count - len(self.resource.users)
-        return num_busy / self.count if self.count > 0 else 0.0
+        """Current utilization of this pool"""
+        return self.busy_servers / self.count if self.count > 0 else 0.0
+
+    def worker_loop(self, worker_id: int):
+        """
+        Worker process that pulls jobs from queue OR steals them
+        """
+        while True:
+            # 1. Try to get job from OWN queue
+            if len(self.queue.items) > 0:
+                job = yield self.queue.get()
+                yield from self.process_job(job)
+                continue
+
+            # 2. WORK STEALING (If enabled)
+            if self.parent.config.selection_policy == "work_stealing":
+                # Look for victim
+                victim = self.find_victim()
+                if victim:
+                    # Steal!
+                    # print(f"Pool {self.name} stealing from {victim.name}")
+                    job = yield victim.queue.get()
+                    yield from self.process_job(job)
+                    continue
+
+            # 3. If nothing to do, wait for a job to arrive in OWN queue
+            # We wait on the store.get() which blocks until an item is available
+            job = yield self.queue.get()
+            yield from self.process_job(job)
+
+    def find_victim(self):
+        """Find a pool to steal from (Longest Queue)"""
+        best_victim = None
+        max_q = 0
+        
+        for pool in self.parent.pools:
+            if pool != self:
+                q_len = len(pool.queue.items)
+                if q_len > max_q:
+                    max_q = q_len
+                    best_victim = pool
+        
+        return best_victim
+
+    def process_job(self, job):
+        """Process a job (message)"""
+        self.busy_servers += 1
+        message_id, arrival_time = job
+        
+        # Service
+        service_time = self.get_service_time()
+        yield self.env.timeout(service_time)
+        
+        # Metrics
+        self.busy_servers -= 1
+        self.messages_processed += 1
+        self.total_service_time += service_time
+        
+        # Global Metrics
+        departure_time = self.env.now
+        wait_time = self.env.now - service_time - arrival_time
+        # Note: wait_time calculation here is tricky because we don't know exactly when service started relative to arrival
+        # Actually: wait_time = (now - service_time) - arrival_time
+        
+        if not self.parent.is_warmup():
+            self.parent.metrics.arrival_times.append(arrival_time)
+            self.parent.metrics.wait_times.append(max(0, wait_time))
+            self.parent.metrics.service_times.append(service_time)
+            self.parent.metrics.departure_times.append(departure_time)
+            # Queue length is hard to track perfectly per-job in this model, use current
+            self.parent.metrics.queue_lengths.append(self.current_queue_length())
+        else:
+            self.parent.messages_in_warmup += 1
 
 
 class HeterogeneousMMNQueue:
@@ -98,8 +192,10 @@ class HeterogeneousMMNQueue:
 
         # Create server pools (one per server group)
         self.pools: List[ServerPool] = []
-        for group in config.server_groups:
-            pool = ServerPool(env, group)
+        # Create server pools (one per server group)
+        self.pools: List[ServerPool] = []
+        for i, group in enumerate(config.server_groups):
+            pool = ServerPool(env, group, i, self)
             self.pools.append(pool)
 
         # Metrics collection
@@ -148,6 +244,18 @@ class HeterogeneousMMNQueue:
             weights = [pool.count for pool in self.pools]
             total_weight = sum(weights)
             probabilities = [w / total_weight for w in weights]
+            # Randomly select pool (weighted by server count for fairness)
+            weights = [pool.count for pool in self.pools]
+            total_weight = sum(weights)
+            probabilities = [w / total_weight for w in weights]
+            return np.random.choice(self.pools, p=probabilities)
+
+        elif policy == "work_stealing":
+            # Initial assignment is Random (or Round Robin)
+            # The "Stealing" happens in the worker loop
+            weights = [pool.count for pool in self.pools]
+            total_weight = sum(weights)
+            probabilities = [w / total_weight for w in weights]
             return np.random.choice(self.pools, p=probabilities)
 
         elif policy == "fastest_first":
@@ -155,7 +263,7 @@ class HeterogeneousMMNQueue:
             sorted_pools = sorted(self.pools, key=lambda p: p.service_rate, reverse=True)
             for pool in sorted_pools:
                 # Check if pool has capacity (not all servers busy)
-                if len(pool.resource.queue) == 0 and len(pool.resource.users) < pool.count:
+                if pool.current_queue_length() == 0 and pool.busy_servers < pool.count:
                     return pool
             # All pools busy - return fastest anyway
             return sorted_pools[0]
@@ -195,51 +303,16 @@ class HeterogeneousMMNQueue:
     def process_message(self, message_id: int):
         """
         Process a single message through heterogeneous queue
-
-        Flow:
-        1. Message arrives
-        2. Select server pool based on policy
-        3. Wait for available server in that pool
-        4. Get serviced (exponential with pool's service rate)
-        5. Depart
         """
         arrival_time = self.env.now
 
         # Select which server pool to use
         selected_pool = self.select_server_pool()
 
-        # Record queue length at arrival
-        queue_length = selected_pool.current_queue_length()
+        # Put message in the pool's queue
+        # The worker processes will pick it up
+        yield selected_pool.queue.put((message_id, arrival_time))
 
-        # Request a server from the selected pool
-        with selected_pool.resource.request() as request:
-            yield request
-
-            # Server acquired - calculate waiting time
-            wait_time = self.env.now - arrival_time
-
-            # Generate service time from this pool's distribution
-            service_time = selected_pool.get_service_time()
-
-            # Serve the message
-            yield self.env.timeout(service_time)
-
-            # Message departs
-            departure_time = self.env.now
-
-            # Update pool metrics
-            selected_pool.messages_processed += 1
-            selected_pool.total_service_time += service_time
-
-            # Collect metrics (skip warmup period)
-            if not self.is_warmup():
-                self.metrics.arrival_times.append(arrival_time)
-                self.metrics.wait_times.append(wait_time)
-                self.metrics.service_times.append(service_time)
-                self.metrics.queue_lengths.append(queue_length)
-                self.metrics.departure_times.append(departure_time)
-            else:
-                self.messages_in_warmup += 1
 
     def message_generator(self):
         """

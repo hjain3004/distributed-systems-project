@@ -17,7 +17,7 @@ export interface MMNConfig {
 }
 
 export interface MGNConfig extends MMNConfig {
-  distribution: 'pareto' | 'lognormal' | 'exponential';
+  distribution: 'pareto' | 'lognormal' | 'exponential' | 'erlang_k2' | 'erlang_k5';
   alpha: number;
 }
 
