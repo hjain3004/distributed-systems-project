@@ -20,17 +20,17 @@ pip install -r ../requirements.txt
 
 ```bash
 # From the backend directory
-python -m uvicorn api.main:app --reload --port 8000
+python -m uvicorn api.main:app --reload --port 3100
 
 # Or run directly
 python api/main.py
 ```
 
 The API will be available at:
-- **API**: http://localhost:8000
-- **Docs**: http://localhost:8000/api/docs (Swagger UI)
-- **ReDoc**: http://localhost:8000/api/redoc
-- **Health**: http://localhost:8000/api/health
+- **API**: http://localhost:3100
+- **Docs**: http://localhost:3100/api/docs (Swagger UI)
+- **ReDoc**: http://localhost:3100/api/redoc
+- **Health**: http://localhost:3100/api/health
 
 ## API Endpoints
 
@@ -231,12 +231,12 @@ backend/
 
 FastAPI provides automatic interactive documentation:
 
-1. **Swagger UI**: http://localhost:8000/api/docs
+1. **Swagger UI**: http://localhost:3100/api/docs
    - Try out API endpoints
    - See request/response schemas
    - Test authentication
 
-2. **ReDoc**: http://localhost:8000/api/redoc
+2. **ReDoc**: http://localhost:3100/api/redoc
    - Beautiful API documentation
    - Better for reading
 
@@ -244,10 +244,10 @@ FastAPI provides automatic interactive documentation:
 
 ```bash
 # Run a quick test
-curl http://localhost:8000/api/health
+curl http://localhost:3100/api/health
 
 # Run M/M/N simulation
-curl -X POST http://localhost:8000/api/simulations/mmn \
+curl -X POST http://localhost:3100/api/simulations/mmn \
   -H "Content-Type: application/json" \
   -d '{
     "arrival_rate": 100.0,
@@ -258,7 +258,7 @@ curl -X POST http://localhost:8000/api/simulations/mmn \
   }'
 
 # Get analytical calculation (instant)
-curl -X POST http://localhost:8000/api/analytical/mmn \
+curl -X POST http://localhost:3100/api/analytical/mmn \
   -H "Content-Type: application/json" \
   -d '{
     "arrival_rate": 100.0,
@@ -287,7 +287,7 @@ app.add_middleware(
 ### Using Uvicorn
 
 ```bash
-uvicorn api.main:app --host 0.0.0.0 --port 8000 --workers 4
+uvicorn api.main:app --host 0.0.0.0 --port 3100 --workers 4
 ```
 
 ### Using Docker (future)

@@ -88,15 +88,40 @@ This will launch:
 ```
 distributed-systems-project/
 ├── frontend/                    # React Application
-│   ├── src/pages/              # Engineering Tools (ControlCenter, Calculator...)
+│   ├── src/pages/              # Engineering Tools
+│   │   ├── ControlCenter.tsx   # "The Storyteller" - Live Simulation
+│   │   ├── MMNCalculator.tsx   # Capacity Planner (M/M/N)
+│   │   ├── MGNCalculator.tsx   # M/G/N Calculator
+│   │   ├── TandemQueue.tsx     # "The Blast Radius"
+│   │   ├── MGNvsMMNComparison.tsx  # Reality Gap Explorer
+│   │   ├── AllEquations.tsx    # Mathematical Equations Reference
+│   │   └── ResultsViewer.tsx   # Results Browser
 │   ├── src/components/         # Shadcn UI Components
 │   └── src/services/           # API Client
 ├── backend/                     # FastAPI Application
-│   ├── api/routes/             # Endpoints
-│   └── src/models/             # SimPy Simulation Logic
+│   └── api/
+│       ├── routes/             # API Endpoints (Simulations, Analytical, Distributed)
+│       ├── models/             # Pydantic Request/Response Models
+│       └── services/           # Business Logic
+├── src/                         # Core Simulation Engine
+│   ├── models/                 # SimPy Queue Models (M/M/N, M/G/N, Tandem, etc.)
+│   └── analysis/               # Analytical Formulas
 ├── experiments/                 # Validation Scripts
-└── tests/                       # Unit Tests
+└── tests/                       # Unit Tests (40+ tests)
 ```
+
+---
+
+## API Endpoints
+
+The backend exposes the following endpoint groups:
+
+- **Simulations**: `/api/simulations/*` - M/M/N, M/G/N, Tandem, Heterogeneous
+- **Analytical**: `/api/analytical/*` - Closed-form calculations
+- **Distributed**: `/api/distributed/*` - Raft, Vector Clocks, Two-Phase Commit
+- **Results**: `/api/results/*` - Export and compare results
+
+Full API documentation available at: http://localhost:3100/api/docs
 
 ---
 
@@ -106,6 +131,7 @@ distributed-systems-project/
 - [x] **Simulation Engine**: Tuned for "Drama" (Pareto, Legacy, Reliability).
 - [x] **Frontend**: Full "Engineering Tool" suite implemented.
 - [x] **Backend**: All endpoints (M/M/n, M/G/n, Tandem, Distributed) working.
+- [x] **Distributed Systems**: Raft Consensus, Vector Clocks, Two-Phase Commit.
 
 **Validation**: 100% Complete
 - [x] **Math**: Analytical models validated against simulation (<5% error).
@@ -115,5 +141,6 @@ distributed-systems-project/
 - [x] **Architecture**: Updated for final release.
 - [x] **Walkthrough**: Step-by-step guide available.
 
-**Last Updated**: 2025-12-01
+**Last Updated**: 2025-12-10
 **Status**: Final Production Release
+

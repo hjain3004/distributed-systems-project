@@ -344,13 +344,13 @@ When complete:
 
 - [ ] Check endpoint exists in `backend/api/routes/`
 - [ ] Verify route is included in `main.py` with correct prefix
-- [ ] Test directly: `curl http://localhost:6000/api/health`
-- [ ] Check Swagger docs at http://localhost:6000/api/docs
+- [ ] Test directly: `curl http://localhost:3100/api/health`
+- [ ] Check Swagger docs at http://localhost:3100/api/docs
 - [ ] Look for import errors in backend console
 
 ### WebSocket Not Connecting?
 
-- [ ] Check WebSocket URL in `.env`: `ws://localhost:6000`
+- [ ] Check WebSocket URL in `.env`: `ws://localhost:3100`
 - [ ] Verify backend has `@router.websocket()` endpoint
 - [ ] Check browser console for WebSocket errors
 - [ ] Test with simple echo server first
@@ -408,7 +408,7 @@ python backend/simple_main.py
 cd frontend && npm run dev
 
 # 3. Test health
-curl http://localhost:6000/api/health
+curl http://localhost:3100/api/health
 
 # 4. Open browser
 http://localhost:4000
@@ -443,5 +443,5 @@ http://localhost:4000
 
 ---
 
-**Last Updated:** 2025-12-01
+**Last Updated:** 2025-12-10
 **Status:** Final Production Release

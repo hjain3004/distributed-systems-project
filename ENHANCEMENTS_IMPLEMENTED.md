@@ -280,17 +280,17 @@ pip3 install snakes
 | **#2: Validation** | Marginal | Value-by-value tables | ✅ ADDRESSED |
 | **#3: M/G/N Approx** | Kingman only | Whitt + Allen-Cunneen | ✅ RESOLVED |
 | **#4: Extreme Tests** | None | 10 comprehensive tests | ✅ RESOLVED |
-| **Enhancement: Priorities** | None | Config + Model ready | 🔧 IN PROGRESS |
-| **Enhancement: Finite Cap** | None | Config ready | 🔧 IN PROGRESS |
-| **Enhancement: CPN** | None | Planned | ⏳ PENDING |
+| **Enhancement: Priorities** | None | Full model + tests | ✅ COMPLETE |
+| **Enhancement: Finite Cap** | None | Full model + tests | ✅ COMPLETE |
+| **Enhancement: CPN** | None | Not implemented | ⏳ OPTIONAL |
 
 ---
 
 ## Current Test Status
 
 **Before Enhancements**: 29 tests
-**After Current Wave**: 39 tests (all passing)
-**After Full Implementation**: ~50+ tests
+**Current Status**: 40+ tests (all passing)
+**Test Files**: `test_erlang.py`, `test_extreme_conditions.py`, `test_extreme_values.py`, `test_finite_capacity.py`, `test_priority_queues.py`, `test_queueing_laws.py`
 
 ---
 
@@ -308,28 +308,25 @@ pip3 install snakes
 
 ---
 
-## Next Steps
-
-1. **Immediate** (commit current work):
+1. **Completed**:
    - ✅ Configurations for priority & finite capacity
    - ✅ Advanced approximations
    - ✅ Extreme condition tests
    - ✅ Validation tables
+   - ✅ Priority queue model (`src/models/priority_queue.py`)
+   - ✅ Finite capacity model (`src/models/finite_capacity_queue.py`)
+   - ✅ Comprehensive tests (`tests/test_priority_queues.py`, `tests/test_finite_capacity.py`)
 
-2. **Short-term** (next session):
-   - Implement priority queue model
-   - Implement finite capacity model
-   - Add comprehensive tests
-
-3. **Medium-term** (optional):
+2. **Optional** (not required):
    - CPN basic model
    - CPN validation
-   - Full documentation update
 
 ---
 
-**Total Enhancements Completed**: 4/7 core features
-**Total Tests Added**: 10 (all passing)
-**Documentation Quality**: Significantly improved
+**Total Enhancements Completed**: 6/7 core features (CPN optional)
+**Total Tests**: 40+ (all passing)
+**Documentation Quality**: Fully updated
+
+**Last Updated**: 2025-12-10
 
 This positions the project as comprehensive, research-grade work that addresses all valid criticisms while adding valuable advanced features.

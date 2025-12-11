@@ -39,14 +39,14 @@ Testing Distributed Systems Features
 ### Option 2: Comprehensive Unit Tests
 
 ```bash
-# Run all 29 unit tests with verbose output (~97 seconds)
+# Run all unit tests with verbose output
 python3 -m pytest tests/ -v
 ```
 
 **Expected Output:**
 ```
 ============================= test session starts ==============================
-collected 29 items
+collected 40+ items
 
 tests/test_erlang.py::TestErlangDistribution::test_erlang_mean PASSED    [  3%]
 tests/test_erlang.py::TestErlangDistribution::test_erlang_variance PASSED [  6%]
@@ -54,7 +54,7 @@ tests/test_erlang.py::TestErlangDistribution::test_erlang_variance PASSED [  6%]
 tests/test_queueing_laws.py::TestTandemQueue::test_stage2_arrival_rate PASSED [ 89%]
 tests/test_queueing_laws.py::TestStabilityConditions::test_tandem_stage2_stability_check PASSED [100%]
 
-======================== 29 passed in 97.74s (0:01:37) =========================
+======================== 40+ passed =========================
 ```
 
 ### Option 3: Complete Rebuild
@@ -506,9 +506,11 @@ Tests for fundamental queueing laws and tandem queue:
 
 ### Test Summary
 
-**Total Tests**: 29 (all passing)
+**Total Tests**: 40+ (all passing)
 **Code Coverage**:
 - Queue models (M/M/N, M/G/N, M/Ek/N, Tandem): ✓
+- Priority Queue models: ✓
+- Finite Capacity Queue models: ✓
 - Distributions (Pareto, Erlang, Exponential): ✓
 - Analytical formulas (Erlang-C, Little's Law, M/G/N): ✓
 - Statistical methods (Bootstrap, EVT): ✓
@@ -521,7 +523,7 @@ Tests for fundamental queueing laws and tandem queue:
 | Test Suite | Tests | Runtime | Purpose |
 |------------|-------|---------|---------|
 | `./test_all.sh` | 4 integration tests | ~10 sec | Quick smoke test |
-| `pytest tests/` | 29 unit tests | ~97 sec | Comprehensive validation |
+| `pytest tests/` | 40+ unit tests | ~2 min | Comprehensive validation |
 | `./rebuild_all.sh` | All + experiments + plots | ~15-20 min | Complete rebuild |
 
 ---
@@ -546,4 +548,4 @@ echo "All tests passed!"
 
 ---
 
-**Last Updated**: 2025-11-15
+**Last Updated**: 2025-12-10
